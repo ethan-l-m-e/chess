@@ -1,0 +1,47 @@
+.wp {
+    background-image: url("../graphics/pawn-w.png");
+}
+
+.wr {
+    background-image: url("../graphics/rook-w.png");
+}
+
+.wn {
+    background-image: url("../graphics/knight-w.png");
+}
+
+.wb {
+    background-image: url("../graphics/bishop-w.png");
+}
+
+.wk {
+    background-image: url("../graphics/king-w.png");
+}
+
+.wq {
+    background-image: url("../graphics/queen-w.png");
+}
+
+.bp {
+    background-image: url("../graphics/pawn-b.png");
+}
+
+.br {
+    background-image: url("../graphics/rook-b.png");
+}
+
+.bn {
+    background-image: url("../graphics/knight-b.png");
+}
+
+.bb {
+    background-image: url("../graphics/bishop-b.png");
+}
+
+.bk {
+    background-image: url("../graphics/king-b.png");
+}
+
+.bq {
+    background-image: url("../graphics/queen-b.png");
+}

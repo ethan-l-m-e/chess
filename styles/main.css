@@ -1,0 +1,21 @@
+:root {
+    --board-length: 400px;
+}
+
+#board {
+    background-image: url("../graphics/chessboard.png");
+    background-repeat: no-repeat;
+    background-size: cover;
+    width: var(--board-length);
+    height: var(--board-length);
+}
+
+.piece {
+    cursor: grab;
+    position: absolute;
+    background-repeat: no-repeat;
+    background-size: cover;
+    width: calc(var(--board-length) / 8);
+    height: calc(var(--board-length) / 8);
+    transition: transform .5s;
+}
