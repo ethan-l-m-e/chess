@@ -26,6 +26,30 @@ function elementFromType(type) {
     return createPiece(type);
 }
 
+function getMousePositionIn(element, mouseEvent) {
+    let rect = element.getBoundingClientRect();
+    return {
+        x: mouseEvent.clientX - rect.x,
+        y: mouseEvent.clientY - rect.y
+    };
+}
+
+function getSquareNumberFrom(mousePosition) {
+    let cs = getComputedStyle(document.documentElement);
+    let value = cs.getPropertyValue("--board-length");
+    let squareLength = value.slice(0, value.indexOf("px")) / 8;
+
+    let col = Math.floor(mousePosition.x / squareLength);
+    let row = Math.floor(mousePosition.y / squareLength);
+    return col + row * 8;
+}
+
+function handleMouseDown(mouseEvent) {
+    let pos = getMousePositionIn(board, mouseEvent);
+    let square = getSquareNumberFrom(pos);
+    console.log(square);
+}
+
 const plan = [
     "br", "bn", "bb", "bk", "bq", "bb", "bn", "br",
     "bp", "bp", "bp", "bp", "bp", "bp", "bp", "bp",
@@ -45,3 +69,4 @@ for (let i = 0; i < plan.length; i++) {
         board.appendChild(element);
     }
 }
+board.addEventListener("mousedown", handleMouseDown);
