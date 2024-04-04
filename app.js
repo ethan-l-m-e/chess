@@ -1,3 +1,11 @@
+function getBoardLength() {
+    let boardLengthPropertyName = "--board-length";
+    let cs = window.getComputedStyle(document.documentElement);
+    let val = cs.getPropertyValue(boardLengthPropertyName);
+    let units = val.indexOf("px");
+    return Number(val.slice(0, units));
+}
+
 function findFirstInClassList(element, condition) {
     for (let i = 0; i < element.classList.length; i++) {
         let item = element.classList[i];
@@ -19,6 +27,10 @@ function setPiecePosition(piece, squareNumber) {
     piece.classList.add(`square-${squareNumber}`);
 }
 
+function getPieceAt(square) {
+    return board.getElementsByClassName(`piece square-${square}`)[0];
+}
+
 function elementFromType(type) {
     if (type == "  ") {
         return undefined;
@@ -26,28 +38,100 @@ function elementFromType(type) {
     return createPiece(type);
 }
 
-function getMousePositionIn(element, mouseEvent) {
+function getMousePositionIn(element, event) {
     let rect = element.getBoundingClientRect();
     return {
-        x: mouseEvent.clientX - rect.x,
-        y: mouseEvent.clientY - rect.y
+        x: event.clientX - rect.x,
+        y: event.clientY - rect.y
     };
 }
 
 function getSquareNumberFrom(mousePosition) {
-    let cs = getComputedStyle(document.documentElement);
-    let value = cs.getPropertyValue("--board-length");
-    let squareLength = value.slice(0, value.indexOf("px")) / 8;
-
+    let boardLength = getBoardLength();
+    if (mousePosition.x > boardLength ||
+        mousePosition.x < 0 ||
+        mousePosition.y > boardLength ||
+        mousePosition.y < 0) {
+        return undefined;
+    }
+    
+    let squareLength = boardLength / 8;
     let col = Math.floor(mousePosition.x / squareLength);
     let row = Math.floor(mousePosition.y / squareLength);
     return col + row * 8;
 }
 
-function handleMouseDown(mouseEvent) {
-    let pos = getMousePositionIn(board, mouseEvent);
-    let square = getSquareNumberFrom(pos);
-    console.log(square);
+function isInside(element, event) {
+    let rect = element.getBoundingClientRect();
+    let boardLength = getBoardLength();
+    return (
+        event.clientX >= rect.x &&
+        event.clientX <= rect.x + boardLength &&
+        event.clientY >= rect.y &&
+        event.clientY <= rect.y + boardLength
+    );
+}
+
+let draggedPiece;
+function handleMouseDown(event) {
+    if (draggedPiece || !isInside(board, event)) {
+        handleMouseUp(event);
+        return;
+    }
+
+    let mousePosition = getMousePositionIn(board, event);
+    let square = getSquareNumberFrom(mousePosition);
+    draggedPiece = getPieceAt(square);
+    if (draggedPiece) {
+        dragPiece(event); // Fire drag event once on initial click
+        beginDrag(draggedPiece); // Begin subsequent dragging events
+    }
+}
+
+function handleMouseUp(event) {
+    if (draggedPiece) {
+        endDrag(draggedPiece);
+        draggedPiece = undefined;
+    }
+}
+
+function beginDrag(piece) {
+    piece.classList.add("dragging");
+    document.addEventListener("mousemove", dragPiece);
+}
+
+function endDrag(piece) {
+    piece.removeAttribute("style");
+    piece.classList.remove("dragging");
+    document.removeEventListener("mousemove", dragPiece);
+}
+
+function dragPiece(event) {
+    function keepWithin(value, low, high) {
+        if (value < low) {
+            value = low;
+        } 
+        else if (value > high) {
+            value = high;
+        }
+        return value;
+    }
+
+    let boardLength = getBoardLength();
+    let squareLength = boardLength / 8;
+    let mousePosition = getMousePositionIn(board, event);
+
+    // Keep mousePosition within the board
+    mousePosition.x = keepWithin(mousePosition.x, 0, boardLength);
+    mousePosition.y = keepWithin(mousePosition.y, 0, boardLength);
+
+    // Move the piece along with the mouse
+    draggedPiece.style.transform = `translate(${mousePosition.x - squareLength / 2}px, ${mousePosition.y - squareLength / 2}px)`;
+}
+
+function handleContextMenu(event) {
+    event.preventDefault();
+    return false;
 }
 
 const plan = [
@@ -69,4 +153,6 @@ for (let i = 0; i < plan.length; i++) {
         board.appendChild(element);
     }
 }
-board.addEventListener("mousedown", handleMouseDown);
+window.addEventListener("mousedown", handleMouseDown);
+window.addEventListener("mouseup", handleMouseUp);
+board.addEventListener("contextmenu", handleContextMenu);

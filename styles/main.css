@@ -17,5 +17,9 @@
     background-size: cover;
     width: calc(var(--board-length) / 8);
     height: calc(var(--board-length) / 8);
-    transition: transform .5s;
+}
+
+.dragging {
+    cursor: grabbing;
+    z-index: 1;
 }
