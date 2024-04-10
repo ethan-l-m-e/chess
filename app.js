@@ -74,6 +74,7 @@ function isInside(element, event) {
 
 let draggedPiece;
 function handleMouseDown(event) {
+    ui.removeHighlights();
     if (draggedPiece || !isInside(board, event)) {
         handleMouseUp(event);
         return;
@@ -85,6 +86,7 @@ function handleMouseDown(event) {
     if (draggedPiece) {
         dragPiece(event); // Fire drag event once on initial click
         beginDrag(draggedPiece); // Begin subsequent dragging events
+        ui.addHighlights([square]);
     }
 }
 
@@ -156,3 +158,26 @@ for (let i = 0; i < plan.length; i++) {
 window.addEventListener("mousedown", handleMouseDown);
 window.addEventListener("mouseup", handleMouseUp);
 board.addEventListener("contextmenu", handleContextMenu);
+
+class UserInterface {
+    constructor() {
+        this.highlights = document.getElementById("highlights");
+    }
+    createBoardElement(type, squareNumber) {
+        const element = document.createElement("div");
+        element.classList.add(type);
+        element.classList.add(`square-${squareNumber}`)
+        return element;
+    }
+    addHighlights(squares) {
+        squares.forEach((square) => {
+            const highlight = this.createBoardElement("highlight", square);
+            this.highlights.appendChild(highlight);
+        });
+    }
+    removeHighlights() {
+        this.highlights.replaceChildren();
+    }
+}
+
+const ui  = new UserInterface();

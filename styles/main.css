@@ -23,3 +23,11 @@
     cursor: grabbing;
     z-index: 1;
 }
+
+.highlight {
+    position: absolute;
+    background-color: yellow;
+    opacity: .5;
+    width: calc(var(--board-length) / 8);
+    height: calc(var(--board-length) / 8);
+}
