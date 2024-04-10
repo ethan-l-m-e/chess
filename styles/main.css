@@ -2,6 +2,14 @@
     --board-length: 400px;
 }
 
+html {
+    -webkit-user-select: none;
+     -khtml-user-select: none;
+       -moz-user-select: none;
+         -o-user-select: none;
+            user-select: none;
+}
+
 #board {
     background-image: url("../graphics/chessboard.png");
     background-repeat: no-repeat;
