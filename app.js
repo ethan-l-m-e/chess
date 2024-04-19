@@ -1,8 +1,8 @@
 function getBoardLength() {
-    let boardLengthPropertyName = "--board-length";
+    let boardLengthPropertyName = '--board-length';
     let cs = window.getComputedStyle(document.documentElement);
     let val = cs.getPropertyValue(boardLengthPropertyName);
-    let units = val.indexOf("px");
+    let units = val.indexOf('px');
     return Number(val.slice(0, units));
 }
 
@@ -15,14 +15,14 @@ function findFirstInClassList(element, condition) {
 }
 
 function createPiece(type) {
-    let piece = document.createElement("div");
-    piece.classList.add("piece");
+    let piece = document.createElement('div');
+    piece.classList.add('piece');
     piece.classList.add(type);
     return piece;
 }
 
 function setPiecePosition(piece, squareNumber) {
-    let currentPosition = findFirstInClassList(piece, (item) => item.startsWith("square-"));
+    let currentPosition = findFirstInClassList(piece, (item) => item.startsWith('square-'));
     piece.classList.remove(currentPosition);
     piece.classList.add(`square-${squareNumber}`);
 }
@@ -32,7 +32,7 @@ function getPieceAt(square) {
 }
 
 function elementFromType(type) {
-    if (type == "  ") {
+    if (type == '  ') {
         return undefined;
     }
     return createPiece(type);
@@ -106,14 +106,14 @@ function handleMouseUp(event) {
 }
 
 function beginDrag(piece) {
-    piece.classList.add("dragging");
-    document.addEventListener("mousemove", dragPiece);
+    piece.classList.add('dragging');
+    document.addEventListener('mousemove', dragPiece);
 }
 
 function endDrag(piece) {
-    piece.removeAttribute("style");
-    piece.classList.remove("dragging");
-    document.removeEventListener("mousemove", dragPiece);
+    piece.removeAttribute('style');
+    piece.classList.remove('dragging');
+    document.removeEventListener('mousemove', dragPiece);
 }
 
 function dragPiece(event) {
@@ -145,17 +145,17 @@ function handleContextMenu(event) {
 }
 
 const plan = [
-    "br", "bn", "bb", "  ", "bq", "bb", "bn", "br",
-    "bp", "bp", "bp", "bp", "bp", "bp", "bp", "bp",
-    "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
-    "  ", "  ", "  ", "wb", "  ", "  ", "  ", "  ",
-    "  ", "  ", "  ", "wq", "  ", "bk", "  ", "  ",
-    "  ", "  ", "wn", "  ", "bb", "  ", "  ", "  ",
-    "wp", "wp", "wp", "wp", "wp", "wp", "wp", "wp",
-    "wr", "wn", "wb", "wk", "wq", "wb", "wn", "wr"
+    'br', 'bn', 'bb', '  ', 'bq', 'bb', 'bn', 'br',
+    'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp',
+    '  ', '  ', '  ', '  ', '  ', '  ', '  ', '  ',
+    '  ', '  ', '  ', 'wb', '  ', '  ', '  ', '  ',
+    '  ', '  ', '  ', 'wq', '  ', 'bk', '  ', '  ',
+    '  ', '  ', 'wn', '  ', 'bb', '  ', '  ', '  ',
+    'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp',
+    'wr', 'wn', 'wb', 'wk', 'wq', 'wb', 'wn', 'wr'
 ];
 
-const board = document.getElementById("board");
+const board = document.getElementById('board');
 for (let i = 0; i < plan.length; i++) {
     let element = elementFromType(plan[i]);
     if (element) {
@@ -163,9 +163,9 @@ for (let i = 0; i < plan.length; i++) {
         board.appendChild(element);
     }
 }
-window.addEventListener("mousedown", handleMouseDown);
-window.addEventListener("mouseup", handleMouseUp);
-board.addEventListener("contextmenu", handleContextMenu);
+window.addEventListener('mousedown', handleMouseDown);
+window.addEventListener('mouseup', handleMouseUp);
+board.addEventListener('contextmenu', handleContextMenu);
 
 /**
  * Types of mouse moves.
@@ -186,8 +186,8 @@ class UserInterface {
      */
     constructor(engine) {
         this.engine = engine;
-        this.highlights = document.getElementById("highlights");
-        this.moveMarkers = document.getElementById("move-markers");
+        this.highlights = document.getElementById('highlights');
+        this.moveMarkers = document.getElementById('move-markers');
         this.undraggableSquares = [];
         this.selected = null;
         this.hadSelected = false;
@@ -762,17 +762,17 @@ function pieceFromCode(code) {
     const color = code.charAt(0);
     const pieceType = code.charAt(1);
     switch (pieceType) {
-        case "p":
+        case 'p':
             return new Pawn(color);
-        case "r":
+        case 'r':
             return new Rook(color);
-        case "n":
+        case 'n':
             return new Knight(color);
-        case "b":
+        case 'b':
             return new Bishop(color);
-        case "k":
+        case 'k':
             return new King(color);
-        case "q":
+        case 'q':
             return new Queen(color);
         default:
             return undefined;
