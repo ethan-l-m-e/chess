@@ -2,6 +2,10 @@
     --board-length: 400px;
 }
 
+* {
+    box-sizing: border-box;
+}
+
 html {
     -webkit-user-select: none;
      -khtml-user-select: none;
@@ -19,6 +23,7 @@ html {
 }
 
 .piece {
+    z-index: 1; /* To be above highlights. */
     cursor: grab;
     position: absolute;
     background-repeat: no-repeat;
@@ -28,14 +33,27 @@ html {
 }
 
 .dragging {
+    z-index: 3; /* To be above everything. */
     cursor: grabbing;
-    z-index: 1;
 }
 
 .highlight {
+    z-index: 0; /* To be below pieces. */
     position: absolute;
     background-color: yellow;
     opacity: .5;
+    width: calc(var(--board-length) / 8);
+    height: calc(var(--board-length) / 8);
+}
+
+.move-marker {
+    z-index: 2; /* To be above move markers. */
+    position: absolute;
+    background-clip: content-box;
+    background-color: black;
+    opacity: .4;
+    border-radius: 50%;
+    padding: calc(var(--board-length) / 24);
     width: calc(var(--board-length) / 8);
     height: calc(var(--board-length) / 8);
 }
