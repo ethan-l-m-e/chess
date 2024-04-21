@@ -1,28 +1,28 @@
 function getBoardLength() {
-  let boardLengthPropertyName = '--board-length';
-  let cs = window.getComputedStyle(document.documentElement);
-  let val = cs.getPropertyValue(boardLengthPropertyName);
-  let units = val.indexOf('px');
+  const boardLengthPropertyName = '--board-length';
+  const cs = window.getComputedStyle(document.documentElement);
+  const val = cs.getPropertyValue(boardLengthPropertyName);
+  const units = val.indexOf('px');
   return Number(val.slice(0, units));
 }
 
 function findFirstInClassList(element, condition) {
   for (let i = 0; i < element.classList.length; i++) {
-    let item = element.classList[i];
+    const item = element.classList[i];
     if (condition(item)) return item;
   }
   return undefined;
 }
 
 function createPiece(type) {
-  let piece = document.createElement('div');
+  const piece = document.createElement('div');
   piece.classList.add('piece');
   piece.classList.add(type);
   return piece;
 }
 
 function setPiecePosition(piece, squareNumber) {
-  let currentPosition = findFirstInClassList(piece, (item) => item.startsWith('square-'));
+  const currentPosition = findFirstInClassList(piece, (item) => item.startsWith('square-'));
   piece.classList.remove(currentPosition);
   piece.classList.add(`square-${squareNumber}`);
 }
@@ -38,16 +38,16 @@ function elementFromType(type) {
   return createPiece(type);
 }
 
-function getMousePositionIn(element, event) {
-  let rect = element.getBoundingClientRect();
+function getMousePositionInElement(element, event) {
+  const rect = element.getBoundingClientRect();
   return {
     x: event.clientX - rect.x,
     y: event.clientY - rect.y
   };
 }
 
-function getSquareNumberFrom(mousePosition) {
-  let boardLength = getBoardLength();
+function getSquareNumberOfMouse(mousePosition) {
+  const boardLength = getBoardLength();
   if (mousePosition.x > boardLength ||
     mousePosition.x < 0 ||
     mousePosition.y > boardLength ||
@@ -55,15 +55,15 @@ function getSquareNumberFrom(mousePosition) {
     return undefined;
   }
 
-  let squareLength = boardLength / 8;
-  let col = Math.floor(mousePosition.x / squareLength);
-  let row = Math.floor(mousePosition.y / squareLength);
+  const squareLength = boardLength / 8;
+  const col = Math.floor(mousePosition.x / squareLength);
+  const row = Math.floor(mousePosition.y / squareLength);
   return col + row * 8;
 }
 
-function isInside(element, event) {
-  let rect = element.getBoundingClientRect();
-  let boardLength = getBoardLength();
+function eventInsideElement(element, event) {
+  const rect = element.getBoundingClientRect();
+  const boardLength = getBoardLength();
   return (
     event.clientX >= rect.x &&
     event.clientX <= rect.x + boardLength &&
@@ -75,13 +75,13 @@ function isInside(element, event) {
 let draggedPiece;
 function handleMouseDown(event) {
   /* Blocks click while dragging, or click from outside board */
-  if (draggedPiece || !isInside(board, event)) {
+  if (draggedPiece || !eventInsideElement(board, event)) {
     ui.removeBoardHints();
     handleMouseUp(event);
     return;
   }
-  const mousePosition = getMousePositionIn(board, event);
-  const squareNumber = getSquareNumberFrom(mousePosition);
+  const mousePosition = getMousePositionInElement(board, event);
+  const squareNumber = getSquareNumberOfMouse(mousePosition);
   draggedPiece = getPieceAt(squareNumber);
   if (draggedPiece && ui.canDrag(squareNumber)) {
     dragPiece(event); // Fire drag event once on initial click
@@ -93,13 +93,13 @@ function handleMouseDown(event) {
 }
 
 function handleMouseUp(event) {
-  const mousePosition = getMousePositionIn(board, event);
-  const squareNumber = getSquareNumberFrom(mousePosition);
+  const mousePosition = getMousePositionInElement(board, event);
+  const squareNumber = getSquareNumberOfMouse(mousePosition);
   if (draggedPiece) {
     endDrag(draggedPiece);
     draggedPiece = undefined;
     /* Blocks drop from outside board */
-    if (isInside(board, event)) {
+    if (eventInsideElement(board, event)) {
       ui.requestMove(squareNumber, ControlType.DROP);
     }
   }
@@ -127,9 +127,9 @@ function dragPiece(event) {
     return value;
   }
 
-  let boardLength = getBoardLength();
-  let squareLength = boardLength / 8;
-  let mousePosition = getMousePositionIn(board, event);
+  const boardLength = getBoardLength();
+  const squareLength = boardLength / 8;
+  const mousePosition = getMousePositionInElement(board, event);
 
   /* Keep mousePosition within the board */
   mousePosition.x = keepWithin(mousePosition.x, 0, boardLength);
@@ -158,7 +158,7 @@ const plan = [
 
 const board = document.getElementById('board');
 for (let i = 0; i < plan.length; i++) {
-  let element = elementFromType(plan[i]);
+  const element = elementFromType(plan[i]);
   if (element) {
     setPiecePosition(element, i);
     board.appendChild(element);
