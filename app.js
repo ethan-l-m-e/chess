@@ -145,28 +145,11 @@ function handleContextMenu(event) {
   return false;
 }
 
-const plan = [
-  'br', 'bn', 'bb', '  ', 'bq', 'bb', 'bn', 'br',
-  'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp',
-  '  ', '  ', '  ', '  ', '  ', '  ', '  ', '  ',
-  '  ', '  ', '  ', 'wb', '  ', '  ', '  ', '  ',
-  '  ', '  ', '  ', 'wq', '  ', 'bk', '  ', '  ',
-  '  ', '  ', 'wn', '  ', 'bb', '  ', '  ', '  ',
-  'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp',
-  'wr', 'wn', 'wb', 'wk', 'wq', 'wb', 'wn', 'wr'
-];
-
-const board = document.getElementById('board');
-for (let i = 0; i < plan.length; i++) {
-  const element = elementFromType(plan[i]);
-  if (element) {
-    setPiecePosition(element, i);
-    board.appendChild(element);
-  }
+function initPlayerControls() {
+  window.addEventListener('mousedown', handleMouseDown);
+  window.addEventListener('mouseup', handleMouseUp);
+  board.addEventListener('contextmenu', handleContextMenu);
 }
-window.addEventListener('mousedown', handleMouseDown);
-window.addEventListener('mouseup', handleMouseUp);
-board.addEventListener('contextmenu', handleContextMenu);
 
 /**
 * Types of mouse moves.
@@ -189,6 +172,7 @@ class UserInterface {
     this.engine = engine;
     this.highlights = document.getElementById('highlights');
     this.moveMarkers = document.getElementById('move-markers');
+    this.pieces = document.getElementById('pieces');
     this.undraggableSquares = [];
     this.selected = null;
     this.hadSelected = false;
@@ -218,6 +202,21 @@ class UserInterface {
       const element = this.createBoardElement(className, squares);
       container.appendChild(element);
     });
+  }
+  /**
+   * Replaces existing board state with the current state of pieces in the chess engine.
+   */
+  resetToBoardState() {
+    const elements = [];
+    const positions = this.engine.getState();
+    positions.forEach((position) => {
+      const code = codeFromPiece(position.piece);
+      const squareNumber = position.squareNumber;
+      const element = createPiece(code);
+      setPiecePosition(element, squareNumber);
+      elements.push(element);
+    });
+    this.pieces.replaceChildren(...elements);
   }
   /**
    * Adds highlights to selected square, as well as possible moves for selected piece.
@@ -393,7 +392,7 @@ class Grid {
   }
   /**
    * Applies a given function to all items in the grid.
-   * @param {function} action - A function with two parameters,
+   * @param {function(Point, any): undefined} action - A function with two parameters,
    * the first parameter is a point, the second is the value stored at the point.
    */
   each(action) {
@@ -753,6 +752,37 @@ class Queen extends Piece {
   }
 }
 
+const PieceCode = {
+  PAWN: 'p',
+  ROOK: 'r',
+  KNIGHT: 'n',
+  BISHOP: 'b',
+  KING: 'k',
+  QUEEN: 'q',
+}
+
+function codeFromPiece(piece) {
+  function stringBuilder(s1, s2) {
+    return `${s1}${s2}`;
+  }
+  const color = piece.color;
+  if (piece instanceof Pawn) {
+    return stringBuilder(color, PieceCode.PAWN);
+  } else if (piece instanceof Rook) {
+    return stringBuilder(color, PieceCode.ROOK);
+  } else if (piece instanceof Knight) {
+    return stringBuilder(color, PieceCode.KNIGHT);
+  } else if (piece instanceof Bishop) {
+    return stringBuilder(color, PieceCode.BISHOP);
+  } else if (piece instanceof King) {
+    return stringBuilder(color, PieceCode.KING);
+  } else if (piece instanceof Queen) {
+    return stringBuilder(color, PieceCode.QUEEN);
+  } else {
+    return '';
+  }
+}
+
 /**
 * Reads in string representations of pieces or lack thereof,
 * and returns the piece to be stored by the chess engine.
@@ -802,28 +832,36 @@ const PieceColor = {
 
 /** Class managing the chess game state. */
 class ChessEngine {
-  /**
-   * Create a chess engine.
-   * @param {Array.<string>} plan - The initial layout of pieces.
-   */
-  constructor(plan) {
+  /** Create a chess engine. */
+  constructor() {
     const grid = new Grid(8, 8);
-    for (let i = 0; i < plan.length; i++) {
-      const row = i % 8;
-      const col = Math.floor(i / 8);
-      const center = new Point(row, col);
-      const piece = pieceFromCode(plan[i]);
-      grid.setValueAt(center, piece);
-    }
     this.grid = grid;
     this.playingColor = PieceColor.WHITE;
     this.takenPiece = null;
     this.moveArray = [];
   }
   /**
+   * Takes in an array of strings representing the layout of pieces,
+   * and inserts as chess objects into the grid.
+   * @param {Array.<string>} layout - The initial layout of pieces.
+   */
+  init(layout) {
+    if (layout.length !== 64) {
+      throw new Error('Invalid plan size');
+    }
+    for (let i = 0; i < layout.length; i++) {
+      const row = i % 8;
+      const col = Math.floor(i / 8);
+      const center = new Point(row, col);
+      const piece = pieceFromCode(layout[i]);
+      this.grid.setValueAt(center, piece);
+    }
+    this.#precomputeMoves();
+  }
+  /**
    * Calculates all valid moves for the current board state and playing color.
    */
-  precomputeMoves() {
+  #precomputeMoves() {
     /* Reset the previous precomputed moves */
     for (let i = 0; i < 64; i++) {
       this.moveArray[i] = [];
@@ -904,6 +942,23 @@ class ChessEngine {
     }
   }
   /**
+   * Retrieves the current state of the board.
+   * @returns {Array.<Object>} - The list of pieces and their point on the board.
+   */
+  getState() {
+    const positions = [];
+    this.grid.each((center, piece) => {
+      if (!piece) return;
+      positions.push(
+        {
+          piece: piece,
+          point: center,
+        }
+      );
+    });
+    return positions;
+  }
+  /**
    * Retrieves computed valid moves at a point.
    * @param {Point} point - The queried point.
    * @returns {Array.<Object>} A list of move objects.
@@ -957,6 +1012,19 @@ class ChessEngineAdapter {
     const col = Math.floor(squareNumber / 8);
     return new Point(row, col);
   }
+  getState() {
+    const positions = this.engine.getState();
+    const adaptedArray = [];
+    positions.forEach((position) => {
+      adaptedArray.push(
+        {
+          piece: position.piece,
+          squareNumber: this.squareNumberFromPoint(position.point),
+        }
+      );
+    });
+    return adaptedArray;
+  }
   /**
    * Requests available moves from chess engine,
    * with move objects adapted to use square number instead of point.
@@ -993,6 +1061,20 @@ class ChessEngineAdapter {
   }
 }
 
-const engine = new ChessEngine(plan);
-engine.precomputeMoves(); // TODO: handle precomputation after moving && when game starts.
+const layout = [
+  'br', 'bn', 'bb', '  ', 'bq', 'bb', 'bn', 'br',
+  'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp',
+  '  ', '  ', '  ', '  ', '  ', '  ', '  ', '  ',
+  '  ', '  ', '  ', 'wb', '  ', '  ', '  ', '  ',
+  '  ', '  ', '  ', 'wq', '  ', 'bk', '  ', '  ',
+  '  ', '  ', 'wn', '  ', 'bb', '  ', '  ', '  ',
+  'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp',
+  'wr', 'wn', 'wb', 'wk', 'wq', 'wb', 'wn', 'wr',
+];
+
+const engine = new ChessEngine();
+engine.init(layout);
 const ui = new UserInterface(new ChessEngineAdapter(engine));
+ui.resetToBoardState();
+
+initPlayerControls();
