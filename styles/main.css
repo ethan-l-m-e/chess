@@ -57,3 +57,13 @@ html {
     width: calc(var(--board-length) / 8);
     height: calc(var(--board-length) / 8);
 }
+
+.capture-marker {
+  z-index: 2; /* To be above move markers. */
+  position: absolute;
+  border: calc(var(--board-length) / 64) solid black;
+  opacity: .4;
+  border-radius: 50%;
+  width: calc(var(--board-length) / 8);
+  height: calc(var(--board-length) / 8);
+}

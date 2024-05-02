@@ -14,30 +14,6 @@ function findFirstInClassList(element, condition) {
   return undefined;
 }
 
-function createPiece(type) {
-  const piece = document.createElement('div');
-  piece.classList.add('piece');
-  piece.classList.add(type);
-  return piece;
-}
-
-function setPiecePosition(piece, squareNumber) {
-  const currentPosition = findFirstInClassList(piece, (item) => item.startsWith('square-'));
-  piece.classList.remove(currentPosition);
-  piece.classList.add(`square-${squareNumber}`);
-}
-
-function getPieceAt(square) {
-  return board.getElementsByClassName(`piece square-${square}`)[0];
-}
-
-function elementFromType(type) {
-  if (type == '  ') {
-    return undefined;
-  }
-  return createPiece(type);
-}
-
 function getMousePositionInElement(element, event) {
   const rect = element.getBoundingClientRect();
   return {
@@ -72,20 +48,17 @@ function eventInsideElement(element, event) {
   );
 }
 
-let draggedPiece;
 function handleMouseDown(event) {
   /* Blocks click while dragging, or click from outside board */
-  if (draggedPiece || !eventInsideElement(board, event)) {
+  if (ui.isDragging || !eventInsideElement(board, event)) {
     ui.removeBoardHints();
     handleMouseUp(event);
     return;
   }
   const mousePosition = getMousePositionInElement(board, event);
   const squareNumber = getSquareNumberOfMouse(mousePosition);
-  draggedPiece = getPieceAt(squareNumber);
-  if (draggedPiece && ui.canDrag(squareNumber)) {
-    dragPiece(event); // Fire drag event once on initial click
-    beginDrag(draggedPiece); // Begin subsequent dragging events
+  if (ui.canDrag(squareNumber)) {
+    ui.beginDrag(squareNumber, event);
     ui.select(squareNumber);
   } else if (ui.selected) {
     ui.requestMove(squareNumber, ControlType.CLICK);
@@ -95,49 +68,13 @@ function handleMouseDown(event) {
 function handleMouseUp(event) {
   const mousePosition = getMousePositionInElement(board, event);
   const squareNumber = getSquareNumberOfMouse(mousePosition);
-  if (draggedPiece) {
-    endDrag(draggedPiece);
-    draggedPiece = undefined;
+  if (ui.isDragging) {
+    ui.endDrag();
     /* Blocks drop from outside board */
     if (eventInsideElement(board, event)) {
       ui.requestMove(squareNumber, ControlType.DROP);
     }
   }
-}
-
-function beginDrag(piece) {
-  piece.classList.add('dragging');
-  document.addEventListener('mousemove', dragPiece);
-}
-
-function endDrag(piece) {
-  piece.removeAttribute('style');
-  piece.classList.remove('dragging');
-  document.removeEventListener('mousemove', dragPiece);
-}
-
-function dragPiece(event) {
-  function keepWithin(value, low, high) {
-    if (value < low) {
-      value = low;
-    }
-    else if (value > high) {
-      value = high;
-    }
-    return value;
-  }
-
-  const boardLength = getBoardLength();
-  const squareLength = boardLength / 8;
-  const mousePosition = getMousePositionInElement(board, event);
-
-  /* Keep mousePosition within the board */
-  mousePosition.x = keepWithin(mousePosition.x, 0, boardLength);
-  mousePosition.y = keepWithin(mousePosition.y, 0, boardLength);
-
-  /* Move the piece along with the mouse */
-  draggedPiece.style.transform = `translate(${mousePosition.x - squareLength / 2}px, ` +
-    `${mousePosition.y - squareLength / 2}px)`;
 }
 
 function handleContextMenu(event) {
@@ -156,9 +93,20 @@ function initPlayerControls() {
 * @enum {string}
 */
 const ControlType = {
-  /** Click on destination square */
+  /** Click on destination square. */
   CLICK: 'click',
+  /** Mouse drag and drop onto destination square. */
   DROP: 'drop',
+}
+
+/**
+ * Class names of board hints.
+ * @enum {string}
+ */
+const BoardHintClass = {
+  MOVE: 'move-marker',
+  CAPTURE: 'capture-marker',
+  HIGHLIGHT: 'highlight',
 }
 
 /** Class handling the user interface of the app */
@@ -169,14 +117,52 @@ class UserInterface {
    * class.
    */
   constructor(engine) {
+    /* Chess engine interface. */
     this.engine = engine;
+    /* DOM 'container' elements. */
     this.highlights = document.getElementById('highlights');
     this.moveMarkers = document.getElementById('move-markers');
+    this.captureMarkers = document.getElementById('capture-markers');
     this.pieces = document.getElementById('pieces');
+    /* Variables for selecting and moving pieces. */
     this.undraggableSquares = [];
     this.selected = null;
     this.hadSelected = false;
     this.hadSelectedSquareNumber = null;
+    /* Variables for dragging with mouse. */
+    this.draggedPiece = null;
+    this.isDragging = false;
+    /* Bind function to this class to give access to class properties. */
+    this.dragFunction = this.dragPiece.bind(this);
+  }
+  /**
+   * Creates a HTML element with the appropriate classes for a piece.
+   * @param {string} code - The string code of the piece.
+   * @returns {HTMLElement} The created piece.
+   */
+  createPiece(code) {
+    const piece = document.createElement('div');
+    piece.classList.add('piece');
+    piece.classList.add(code);
+    return piece;
+  }
+  /**
+   * Changes the class on a piece to move it to a new position in the DOM.
+   * @param {HTMLElement} piece - The element to modify.
+   * @param {number} squareNumber - The destination square number.
+   */
+  setPiecePosition(piece, squareNumber) {
+    const currentPosition = findFirstInClassList(piece, (item) => item.startsWith('square-'));
+    piece.classList.remove(currentPosition);
+    piece.classList.add(`square-${squareNumber}`);
+  }
+  /**
+   * Attempts to get the piece at a given square number.
+   * @param {number} squareNumber - The given square number.
+   * @returns {HTMLElement|undefined} - The piece at the square number if it exists, or undefined.
+   */
+  getPieceAt(squareNumber) {
+    return board.getElementsByClassName(`piece square-${squareNumber}`)[0];
   }
   /**
    * Helper for creating a HTML element with the given name, on the given square number.
@@ -212,25 +198,41 @@ class UserInterface {
     positions.forEach((position) => {
       const code = codeFromPiece(position.piece);
       const squareNumber = position.squareNumber;
-      const element = createPiece(code);
-      setPiecePosition(element, squareNumber);
+      const element = this.createPiece(code);
+      this.setPiecePosition(element, squareNumber);
       elements.push(element);
     });
     this.pieces.replaceChildren(...elements);
   }
   /**
-   * Adds highlights to selected square, as well as possible moves for selected piece.
-   * @param {number} squareNumber 
+   * Updates possible destination squares for selected piece.
+   * These destination squares will then only allow movement to the square, and
+   * disable the default dragging behaviour.
+   * @param {number} squareNumber - The square number of the selected piece.
    */
   updateBoardHints(squareNumber) {
     const moves = this.engine.getMovesAtSquareNumber(squareNumber);
     const normalMoves = [];
+    const captureMoves = [];
     moves.forEach((move) => {
-      normalMoves.push(move.to);
+      switch(move.moveType) {
+        case MoveTypes.MOVE:
+          normalMoves.push(move.to);
+          break;
+        case MoveTypes.CAPTURE:
+          captureMoves.push(move.to);
+          break;
+        default:
+      }
+
+      /* Disable dragging on the destination square. */
       this.undraggableSquares.push(move.to);
     });
-    this.insertBoardElements(normalMoves, 'move-marker', this.moveMarkers);
-    this.insertBoardElements([squareNumber], 'highlight', this.highlights);
+
+    this.insertBoardElements(normalMoves, BoardHintClass.MOVE, this.moveMarkers);
+    this.insertBoardElements(captureMoves, BoardHintClass.CAPTURE, this.moveMarkers);
+    this.insertBoardElements([squareNumber], BoardHintClass.HIGHLIGHT, 
+      this.highlights);
   }
   /**
    * Removes inserted board elements from the DOM.
@@ -239,6 +241,7 @@ class UserInterface {
     this.undraggableSquares = [];
     this.highlights.replaceChildren();
     this.moveMarkers.replaceChildren();
+    this.captureMarkers.replaceChildren();
   }
   /**
    * Keeps track of whether any selection exists beforehand,
@@ -302,15 +305,80 @@ class UserInterface {
   }
   /**
    * Checks if dragging with a mouse is possible for a given square,
-   * possible destination squares for the selected square are recorded as un-draggable.
-   * @param {number} squareNumber 
+   * possible destination squares for the selected square are recorded as
+   * un-draggable.
+   * @param {number} squareNumber - The square number to drag from.
    * @returns True if square is not un-draggable.
    */
   canDrag(squareNumber) {
-    if (this.undraggableSquares.includes(squareNumber)) {
+    const pieceToDrag = this.getPieceAt(squareNumber);
+    if (!pieceToDrag || this.undraggableSquares.includes(squareNumber)) {
       return false;
     }
     return true;
+  }
+  /**
+   * Starts dragging a piece from the given square number.
+   * Must check for canDrag before being called.
+   * @param {number} squareNumber - The given square number.
+   * @param {Event} event - The mouse event.
+   */
+  beginDrag(squareNumber, event) {
+    this.draggedPiece = this.getPieceAt(squareNumber);
+    if (!this.draggedPiece) {
+      throw new Error('No dragged piece initialized');
+    }
+    this.isDragging = true;
+    this.draggedPiece.classList.add('dragging');
+    
+    ui.dragPiece(event); // Fire drag event once on initial click
+    document.addEventListener('mousemove', this.dragFunction);
+  }
+  /**
+   * Stops dragging the currently dragged piece.
+   */
+  endDrag() {
+    if (!this.draggedPiece) {
+      throw new Error('No dragged piece initialized');
+    }
+    this.draggedPiece.removeAttribute('style');
+    this.draggedPiece.classList.remove('dragging');
+    this.draggedPiece = null;
+    this.isDragging = false;
+    document.removeEventListener('mousemove', this.dragFunction);
+  }
+  /**
+   * Drags the currently dragged piece by transforming the piece element's translation to match the
+   * mouse's position relative to the board, based on a given mouse move event provided.
+   * The mouse position kept within the bounds of the board, even if the actual mouse position moves
+   * outside.
+   * @param {Event} event - The mouse move event.
+   */
+  dragPiece(event) {
+    if (!this.draggedPiece) {
+      throw new Error('No dragged piece initialized');
+    }
+    function keepWithin(value, low, high) {
+      if (value < low) {
+        value = low;
+      }
+      else if (value > high) {
+        value = high;
+      }
+      return value;
+    }
+  
+    const boardLength = getBoardLength();
+    const squareLength = boardLength / 8;
+    const mousePosition = getMousePositionInElement(board, event);
+  
+    /* Keep mousePosition within the board */
+    mousePosition.x = keepWithin(mousePosition.x, 0, boardLength);
+    mousePosition.y = keepWithin(mousePosition.y, 0, boardLength);
+  
+    /* Move the piece along with the mouse */
+    this.draggedPiece.style.transform = `translate(${mousePosition.x - squareLength / 2}px, ` +
+      `${mousePosition.y - squareLength / 2}px)`;
   }
 }
 
@@ -571,12 +639,22 @@ class Knight extends Piece {
 
       if (grid.isInside(newPos)) {
         const existingPiece = grid.valueAt(newPos);
-        if (!existingPiece ||
-          (existingPiece && existingPiece.color !== this.color)) {
+        if (existingPiece) { 
+          if (existingPiece.color !== this.color) {
+            moves.push(
+              {
+                isCapturing: true,
+                moveType: 'capture',
+                from: center,
+                to: newPos,
+              }
+            );
+          }
+        } else {
           moves.push(
             {
               isCapturing: true,
-              moveType: 'capture',
+              moveType: 'move',
               from: center,
               to: newPos,
             }
@@ -891,6 +969,10 @@ class ChessEngine {
   #step(move) {
     if (move.moveType === MoveTypes.CAPTURE) {
       this.takenPiece = this.grid.valueAt(move.to);
+    } else if (move.moveType === MoveTypes.MOVE) {
+      if (this.grid.valueAt(move.to)) {
+        throw new Error('Cannot step moveType.MOVE to place with existing piece');
+      }
     }
     this.grid.moveValue(move.from, move.to);
   }
@@ -1066,7 +1148,7 @@ const layout = [
   'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp',
   '  ', '  ', '  ', '  ', '  ', '  ', '  ', '  ',
   '  ', '  ', '  ', 'wb', '  ', '  ', '  ', '  ',
-  '  ', '  ', '  ', 'wq', '  ', 'bk', '  ', '  ',
+  '  ', '  ', '  ', 'wq', '  ', 'bk', 'wn', '  ',
   '  ', '  ', 'wn', '  ', 'bb', '  ', '  ', '  ',
   'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp',
   'wr', 'wn', 'wb', 'wk', 'wq', 'wb', 'wn', 'wr',
