@@ -1,3 +1,7 @@
+/**
+ * Gets the CSS value (defined in pixels) of the board length.
+ * @returns {number} The board length.
+ */
 function getBoardLength() {
   const boardLengthPropertyName = '--board-length';
   const cs = window.getComputedStyle(document.documentElement);
@@ -6,6 +10,12 @@ function getBoardLength() {
   return Number(val.slice(0, units));
 }
 
+/**
+ * Finds the first class of an element that satisfies given condition.
+ * @param {HTMLElement} element - The html element.
+ * @param {function(string): boolean} condition - Function that acts on each class name.
+ * @returns {string|undefined} The class name if found, else undefined.
+ */
 function findFirstInClassList(element, condition) {
   for (let i = 0; i < element.classList.length; i++) {
     const item = element.classList[i];
@@ -14,6 +24,12 @@ function findFirstInClassList(element, condition) {
   return undefined;
 }
 
+/**
+ * Finds the coordinates of the mouse relative to a given element, for a given mouse event.
+ * @param {HTMLElement} element - The html element.
+ * @param {MouseEvent} event - The mouse event.
+ * @returns {Object} An object containing the x and y coordinates.
+ */
 function getMousePositionInElement(element, event) {
   const rect = element.getBoundingClientRect();
   return {
@@ -22,6 +38,11 @@ function getMousePositionInElement(element, event) {
   };
 }
 
+/**
+ * Finds the corresponding square number in the chess board, given the mouse position.
+ * @param {Object} mousePosition - An object with the mouse x and y coordinates.
+ * @returns {number|undefined} The square number if inside the board, else undefined.
+ */
 function getSquareNumberOfMouse(mousePosition) {
   const boardLength = getBoardLength();
   if (mousePosition.x > boardLength ||
@@ -37,6 +58,12 @@ function getSquareNumberOfMouse(mousePosition) {
   return col + row * 8;
 }
 
+/**
+ * Checks if a given event was triggered within a given element.
+ * @param {HTMLElement} element - The html element.
+ * @param {Event} event - The event to check.
+ * @returns {boolean} True if event is inside element.
+ */
 function eventInsideElement(element, event) {
   const rect = element.getBoundingClientRect();
   const boardLength = getBoardLength();
@@ -48,13 +75,21 @@ function eventInsideElement(element, event) {
   );
 }
 
+/**
+ * Handles player click or drag.
+ * @param {MouseEvent} event - The mouse event.
+ * @returns {undefined} - Return value is not used.
+ */
 function handleMouseDown(event) {
   /* Blocks click while dragging, or click from outside board */
   if (ui.isDragging || !eventInsideElement(board, event)) {
-    ui.removeBoardHints();
+    ui.deselect();
     handleMouseUp(event);
     return;
   }
+  /* Only accept main mouse button. */
+  if (event.button !== 0) return;
+
   const mousePosition = getMousePositionInElement(board, event);
   const squareNumber = getSquareNumberOfMouse(mousePosition);
   if (ui.canDrag(squareNumber)) {
@@ -65,6 +100,11 @@ function handleMouseDown(event) {
   }
 }
 
+/**
+ * Handles player releasing the mouse button.
+ * For example, when player drops a piece onto a board square.
+ * @param {MouseEvent} event - The mouse event.
+ */
 function handleMouseUp(event) {
   const mousePosition = getMousePositionInElement(board, event);
   const squareNumber = getSquareNumberOfMouse(mousePosition);
@@ -77,11 +117,19 @@ function handleMouseUp(event) {
   }
 }
 
+/**
+ * Disables the context menu while clicking on the chess board.
+ * @param {Event} event - The context menu event.
+ * @returns {boolean} Always returns false.
+ */
 function handleContextMenu(event) {
   event.preventDefault();
   return false;
 }
 
+/**
+ * Sets up event listeners to allow player to interact with the board.
+ */
 function initPlayerControls() {
   window.addEventListener('mousedown', handleMouseDown);
   window.addEventListener('mouseup', handleMouseUp);
@@ -134,19 +182,21 @@ class UserInterface {
     this.draggedPiece = null;
     this.isDragging = false;
     /* Bind function to this class to give access to class properties. */
-    this.dragFunction = this.dragPiece.bind(this);
+    this.dragFunction = this.#dragPiece.bind(this);
   }
+
   /**
    * Creates a HTML element with the appropriate classes for a piece.
    * @param {string} code - The string code of the piece.
    * @returns {HTMLElement} The created piece.
    */
-  createPiece(code) {
+  #createPiece(code) {
     const piece = document.createElement('div');
     piece.classList.add('piece');
     piece.classList.add(code);
     return piece;
   }
+
   /**
    * Changes the class on a piece to move it to a new position in the DOM.
    * @param {HTMLElement} piece - The element to modify.
@@ -154,7 +204,7 @@ class UserInterface {
    * @param {ControlType} controlType - The type of user interaction, click or drop.
    * @return {number} The time taken to animate change in position.
    */
-  setPiecePosition(piece, squareNumber, controlType) {
+  #setPiecePosition(piece, squareNumber, controlType) {
     const currentPosition = findFirstInClassList(piece, (item) => item.startsWith('square-'));
     /* Enable animation. */
     if (controlType === ControlType.CLICK) piece.classList.add('slide');
@@ -169,26 +219,29 @@ class UserInterface {
     }
     return 0;
   }
+
   /**
    * Attempts to get the piece at a given square number.
    * @param {number} squareNumber - The given square number.
-   * @returns {HTMLElement|undefined} - The piece at the square number if it exists, or undefined.
+   * @returns {HTMLElement|undefined} - The piece at the square number if it exists, else undefined.
    */
-  getPieceAt(squareNumber) {
+  #getPieceAt(squareNumber) {
     return board.getElementsByClassName(`piece square-${squareNumber}`)[0];
   }
+
   /**
    * Helper for creating a HTML element with the given name, on the given square number.
    * @param {string} className - The class name.
    * @param {number} squareNumber - The destination square number.
    * @returns {HTMLElement} The created element.
    */
-  createBoardElement(className, squareNumber) {
+  #createBoardElement(className, squareNumber) {
     const element = document.createElement('div');
     element.classList.add(className);
     element.classList.add(`square-${squareNumber}`)
     return element;
   }
+
   /**
    * Inserts elements for the given square numbers, 
    * each with a given class name, into a given parent element.
@@ -196,12 +249,13 @@ class UserInterface {
    * @param {string} className - The name of the element.
    * @param {HTMLElement} container - The parent element.
    */
-  insertBoardElements(squares, className, container) {
+  #insertBoardElements(squares, className, container) {
     squares.forEach((squares) => {
-      const element = this.createBoardElement(className, squares);
+      const element = this.#createBoardElement(className, squares);
       container.appendChild(element);
     });
   }
+
   /**
    * Replaces existing board state with the current state of pieces in the chess engine.
    */
@@ -211,19 +265,20 @@ class UserInterface {
     positions.forEach((position) => {
       const code = codeFromPiece(position.piece);
       const squareNumber = position.squareNumber;
-      const element = this.createPiece(code);
-      this.setPiecePosition(element, squareNumber);
+      const element = this.#createPiece(code);
+      this.#setPiecePosition(element, squareNumber);
       elements.push(element);
     });
     this.pieces.replaceChildren(...elements);
   }
+
   /**
    * Updates possible destination squares for selected piece.
    * These destination squares will then only allow movement to the square, and
    * disable the default dragging behaviour.
    * @param {number} squareNumber - The square number of the selected piece.
    */
-  updateBoardHints(squareNumber) {
+  #updateBoardHints(squareNumber) {
     const moves = this.engine.getMovesAtSquareNumber(squareNumber);
     const normalMoves = [];
     const captureMoves = [];
@@ -242,25 +297,27 @@ class UserInterface {
       this.undraggableSquares.push(move.to);
     });
 
-    this.insertBoardElements(normalMoves, UiClass.MOVE, this.moveMarkers);
-    this.insertBoardElements(captureMoves, UiClass.CAPTURE, this.moveMarkers);
-    this.insertBoardElements([squareNumber], UiClass.HIGHLIGHT, 
+    this.#insertBoardElements(normalMoves, UiClass.MOVE, this.moveMarkers);
+    this.#insertBoardElements(captureMoves, UiClass.CAPTURE, this.moveMarkers);
+    this.#insertBoardElements([squareNumber], UiClass.HIGHLIGHT, 
       this.highlights);
   }
+
   /**
    * Removes inserted board elements from the DOM.
    */
-  removeBoardHints() {
+  #removeBoardHints() {
     this.undraggableSquares = [];
     this.highlights.replaceChildren();
     this.moveMarkers.replaceChildren();
     this.captureMarkers.replaceChildren();
   }
+
   /**
    * Keeps track of whether any selection exists beforehand,
    * to force de-selection only when selection existed.
    */
-  recordIfHadSelected() {
+  #recordIfHadSelected() {
     if (this.selected) {
       this.hadSelected = true;
       this.hadSelectedSquareNumber = this.selected;
@@ -269,23 +326,26 @@ class UserInterface {
       this.hadSelectedSquareNumber = null;
     }
   }
+
   /**
    * Handles the selection of a piece on the board.
    * @param {number} squareNumber 
    */
   select(squareNumber) {
-    this.recordIfHadSelected();
+    this.#recordIfHadSelected();
     this.selected = squareNumber;
-    this.removeBoardHints();
-    this.updateBoardHints(squareNumber);
+    this.#removeBoardHints();
+    this.#updateBoardHints(squareNumber);
   }
+
   /**
    * Removes currently selected square/piece, and other hint markers.
    */
   deselect() {
     this.selected = null;
-    this.removeBoardHints();
+    this.#removeBoardHints();
   }
+
   /**
    * Tries to make a move from the selected square to a given square number.
    * If successful, carry out the move. Else, handle a deselect process.
@@ -314,14 +374,15 @@ class UserInterface {
       return success; // Exit
     }
     /* Move piece elements in the DOM. */
-    const selectedPiece = this.getPieceAt(this.selected);
-    const destinationPiece = this.getPieceAt(squareNumber);
-    const timeTaken = this.setPiecePosition(selectedPiece, squareNumber, controlType);
+    const selectedPiece = this.#getPieceAt(this.selected);
+    const destinationPiece = this.#getPieceAt(squareNumber);
+    const timeTaken = this.#setPiecePosition(selectedPiece, squareNumber, controlType);
     if (destinationPiece) setTimeout(() => destinationPiece.remove(), timeTaken);
     // TODO: Keep track of captured pieces.
     this.deselect();
     return success;
   }
+
   /**
    * Checks if dragging with a mouse is possible for a given square,
    * possible destination squares for the selected square are recorded as
@@ -330,12 +391,13 @@ class UserInterface {
    * @returns True if square is not un-draggable.
    */
   canDrag(squareNumber) {
-    const pieceToDrag = this.getPieceAt(squareNumber);
+    const pieceToDrag = this.#getPieceAt(squareNumber);
     if (!pieceToDrag || this.undraggableSquares.includes(squareNumber)) {
       return false;
     }
     return true;
   }
+
   /**
    * Starts dragging a piece from the given square number.
    * Must check for canDrag before being called.
@@ -343,16 +405,17 @@ class UserInterface {
    * @param {Event} event - The mouse event.
    */
   beginDrag(squareNumber, event) {
-    this.draggedPiece = this.getPieceAt(squareNumber);
+    this.draggedPiece = this.#getPieceAt(squareNumber);
     if (!this.draggedPiece) {
       throw new Error('No dragged piece initialized');
     }
     this.isDragging = true;
     this.draggedPiece.classList.add('dragging');
     
-    ui.dragPiece(event); // Fire drag event once on initial click
+    ui.#dragPiece(event); // Fire drag event once on initial click
     document.addEventListener('mousemove', this.dragFunction);
   }
+
   /**
    * Stops dragging the currently dragged piece.
    */
@@ -366,6 +429,7 @@ class UserInterface {
     this.isDragging = false;
     document.removeEventListener('mousemove', this.dragFunction);
   }
+
   /**
    * Drags the currently dragged piece by transforming the piece element's translation to match the
    * mouse's position relative to the board, based on a given mouse move event provided.
@@ -373,10 +437,11 @@ class UserInterface {
    * outside.
    * @param {Event} event - The mouse move event.
    */
-  dragPiece(event) {
+  #dragPiece(event) {
     if (!this.draggedPiece) {
       throw new Error('No dragged piece initialized');
     }
+
     function keepWithin(value, low, high) {
       if (value < low) {
         value = low;
@@ -386,15 +451,13 @@ class UserInterface {
       }
       return value;
     }
-  
+
     const boardLength = getBoardLength();
     const squareLength = boardLength / 8;
     const mousePosition = getMousePositionInElement(board, event);
-  
     /* Keep mousePosition within the board */
     mousePosition.x = keepWithin(mousePosition.x, 0, boardLength);
     mousePosition.y = keepWithin(mousePosition.y, 0, boardLength);
-  
     /* Move the piece along with the mouse */
     this.draggedPiece.style.transform = `translate(${mousePosition.x - squareLength / 2}px, ` +
       `${mousePosition.y - squareLength / 2}px)`;
@@ -412,6 +475,7 @@ class Point {
     this.x = x;
     this.y = y;
   }
+
   /**
    * Sums coordinates of self and another point.
    * @param {Point} other - Another point.
@@ -420,6 +484,7 @@ class Point {
   add(other) {
     return new Point(this.x + other.x, this.y + other.y);
   }
+
   /**
    * Comparison with another point.
    * @param {Point} other - Another point.
@@ -443,6 +508,7 @@ class Grid {
     const size = width * height;
     this.squares = new Array(size);
   }
+
   /**
    * Gets the value stored in grid at given point.
    * @param {Point} point - A point.
@@ -451,6 +517,7 @@ class Grid {
   valueAt(point) {
     return this.squares[point.x + point.y * this.height];
   }
+
   /**
    * Stores a given value at given point.
    * @param {Point} point - The destination point.
@@ -459,6 +526,7 @@ class Grid {
   setValueAt(point, value) {
     this.squares[point.x + point.y * this.height] = value;
   }
+
   /**
    * Checks if the given point exists within size of grid.
    * @param {Point} point - The point in question.
@@ -468,6 +536,7 @@ class Grid {
     return point.x >= 0 && point.x < this.width &&
       point.y >= 0 && point.y < this.height;
   }
+
   /**
    * Moves the value stored at one point to the location of another point.
    * @param {Point} from - The origin point.
@@ -477,6 +546,7 @@ class Grid {
     this.setValueAt(to, this.valueAt(from));
     this.setValueAt(from, undefined);
   }
+
   /**
    * Applies a given function to all items in the grid.
    * @param {function(Point, any): undefined} action - A function with two parameters,
@@ -502,6 +572,7 @@ class Piece {
     this.color = color;
     this.moved = false;
   }
+
   /**
    * Calculates potential moves that the piece can take.
    * @param {Point} center - The coordinates represented as a point.
@@ -535,6 +606,7 @@ class Pawn extends Piece {
       new Point(1, 1),
     ];
   }
+
   /** @override */
   move(center, grid) {
     const moves = [];
@@ -594,6 +666,7 @@ class Rook extends Piece {
       new Point(0, 1),
     ];
   }
+
   /** @override */
   move(center, grid) {
     const moves = [];
@@ -650,6 +723,7 @@ class Knight extends Piece {
       new Point(-2, 1),
     ];
   }
+
   /** @override */
   move(center, grid) {
     const moves = [];
@@ -703,6 +777,7 @@ class Bishop extends Piece {
       new Point(-1, 1),
     ];
   }
+
   /** @override */
   move(center, grid) {
     const moves = [];
@@ -759,6 +834,7 @@ class King extends Piece {
       new Point(-1, 1),
     ];
   }
+
   /** @override */
   move(center, grid) {
     const moves = [];
@@ -815,6 +891,7 @@ class Queen extends Piece {
       new Point(-1, 1),
     ];
   }
+
   /** @override */
   move(center, grid) {
     const moves = [];
@@ -849,6 +926,10 @@ class Queen extends Piece {
   }
 }
 
+/**
+ * Letter representation of pieces.
+ * @enum {string} 
+ */
 const PieceCode = {
   PAWN: 'p',
   ROOK: 'r',
@@ -858,6 +939,11 @@ const PieceCode = {
   QUEEN: 'q',
 }
 
+/**
+ * Derives the two character code representation from a piece object.
+ * @param {Piece} piece - The piece object.
+ * @returns {string} String representing color and piece.
+ */
 function codeFromPiece(piece) {
   function stringBuilder(s1, s2) {
     return `${s1}${s2}`;
@@ -937,6 +1023,7 @@ class ChessEngine {
     this.takenPiece = null;
     this.moveArray = [];
   }
+
   /**
    * Takes in an array of strings representing the layout of pieces,
    * and inserts as chess objects into the grid.
@@ -955,6 +1042,10 @@ class ChessEngine {
     }
     this.#precomputeMoves();
   }
+
+  /**
+   * Switches the playing color after a move is made.
+   */
   #swapPlayingColor() {
     switch(this.playingColor) {
       case PieceColor.WHITE:
@@ -966,6 +1057,7 @@ class ChessEngine {
       default:
     }
   }
+
   /**
    * Calculates all valid moves for the current board state and playing color.
    */
@@ -992,6 +1084,7 @@ class ChessEngine {
       this.moveArray[center.x + center.y * 8] = validMoves;
     });
   }
+
   /**
    * Executes a move, changing the state in the grid.
    * @param {Object} move - A move object.
@@ -1006,6 +1099,7 @@ class ChessEngine {
     }
     this.grid.moveValue(move.from, move.to);
   }
+
   /**
    * Checks if the board state is allowable after stepping,
    * by making sure that same color king is not left in check.
@@ -1043,6 +1137,7 @@ class ChessEngine {
     }
     return true;
   }
+  
   /**
    * Undoes a previous move made by the step function.
    * @param {Object} move - A move object.
@@ -1053,6 +1148,7 @@ class ChessEngine {
       this.grid.setValueAt(move.to, this.takenPiece);
     }
   }
+
   /**
    * Retrieves the current state of the board.
    * @returns {Array.<Object>} - The list of pieces and their point on the board.
@@ -1070,6 +1166,7 @@ class ChessEngine {
     });
     return positions;
   }
+
   /**
    * Retrieves computed valid moves at a point.
    * @param {Point} point - The queried point.
@@ -1078,6 +1175,7 @@ class ChessEngine {
   getMovesAtPoint(point) {
     return this.moveArray[point.x + point.y * 8];
   }
+
   /**
    * Moves piece from one point to another.
    * @param {Point} pointFrom - The origin point.
@@ -1116,6 +1214,7 @@ class ChessEngineAdapter {
   constructor(engine) {
     this.engine = engine;
   }
+
   /**
    * Helper for converting point to square number.
    * @param {Point} point - A point object.
@@ -1124,6 +1223,7 @@ class ChessEngineAdapter {
   squareNumberFromPoint(point) {
     return point.x + point.y * 8;
   }
+
   /**
    * Helper for converting square number to point.
    * @param {number} squareNumber - A square number.
@@ -1134,6 +1234,7 @@ class ChessEngineAdapter {
     const col = Math.floor(squareNumber / 8);
     return new Point(row, col);
   }
+
   getState() {
     const positions = this.engine.getState();
     const adaptedArray = [];
@@ -1147,6 +1248,7 @@ class ChessEngineAdapter {
     });
     return adaptedArray;
   }
+
   /**
    * Requests available moves from chess engine,
    * with move objects adapted to use square number instead of point.
@@ -1170,6 +1272,7 @@ class ChessEngineAdapter {
     });
     return adaptedArray;
   }
+
   /**
    * Attempts move in chess engine.
    * @param {number} squareFrom - The origin square number.
