@@ -60,7 +60,7 @@ function handleMouseDown(event) {
   if (ui.canDrag(squareNumber)) {
     ui.beginDrag(squareNumber, event);
     ui.select(squareNumber);
-  } else if (ui.selected) {
+  } else if (ui.selected !== null) { // Make sure to check null, as selected can be 0.
     ui.requestMove(squareNumber, ControlType.CLICK);
   }
 }
@@ -100,13 +100,14 @@ const ControlType = {
 }
 
 /**
- * Class names of board hints.
+ * Class names of ui elements.
  * @enum {string}
  */
-const BoardHintClass = {
+const UiClass = {
   MOVE: 'move-marker',
   CAPTURE: 'capture-marker',
   HIGHLIGHT: 'highlight',
+  SLIDE: 'slide',
 }
 
 /** Class handling the user interface of the app */
@@ -150,11 +151,23 @@ class UserInterface {
    * Changes the class on a piece to move it to a new position in the DOM.
    * @param {HTMLElement} piece - The element to modify.
    * @param {number} squareNumber - The destination square number.
+   * @param {ControlType} controlType - The type of user interaction, click or drop.
+   * @return {number} The time taken to animate change in position.
    */
-  setPiecePosition(piece, squareNumber) {
+  setPiecePosition(piece, squareNumber, controlType) {
     const currentPosition = findFirstInClassList(piece, (item) => item.startsWith('square-'));
+    /* Enable animation. */
+    if (controlType === ControlType.CLICK) piece.classList.add('slide');
+    /* Update position. */
     piece.classList.remove(currentPosition);
     piece.classList.add(`square-${squareNumber}`);
+    /* Disable animation. */
+    if (controlType === ControlType.CLICK) {
+      const timeTaken = parseFloat(getComputedStyle(piece)['transitionDuration']) * 1000;
+      setTimeout(() => piece.classList.remove('slide'), timeTaken);
+      return timeTaken;
+    }
+    return 0;
   }
   /**
    * Attempts to get the piece at a given square number.
@@ -229,9 +242,9 @@ class UserInterface {
       this.undraggableSquares.push(move.to);
     });
 
-    this.insertBoardElements(normalMoves, BoardHintClass.MOVE, this.moveMarkers);
-    this.insertBoardElements(captureMoves, BoardHintClass.CAPTURE, this.moveMarkers);
-    this.insertBoardElements([squareNumber], BoardHintClass.HIGHLIGHT, 
+    this.insertBoardElements(normalMoves, UiClass.MOVE, this.moveMarkers);
+    this.insertBoardElements(captureMoves, UiClass.CAPTURE, this.moveMarkers);
+    this.insertBoardElements([squareNumber], UiClass.HIGHLIGHT, 
       this.highlights);
   }
   /**
@@ -276,13 +289,14 @@ class UserInterface {
   /**
    * Tries to make a move from the selected square to a given square number.
    * If successful, carry out the move. Else, handle a deselect process.
-   * @param {number} squareNumber - The square number.
-   * @param {!ControlType} controlType - A click or drag.
-   * @returns {undefined} On completion.
+   * @param {number} squareNumber - The destination square number.
+   * @param {!ControlType} controlType - A click or drop.
+   * @returns {boolean} True on success.
    */
   requestMove(squareNumber, controlType) {
     const success = this.engine.move(this.selected, squareNumber);
     if (!success) {
+      /* Handle fail condition. */
       switch (controlType) {
         case ControlType.CLICK:
           if (squareNumber !== this.selected) {
@@ -297,11 +311,16 @@ class UserInterface {
           break;
         default:
       }
-      return undefined; // Exit
+      return success; // Exit
     }
-    // TODO: Move pieces on the ui
-    console.log('handlePotentialMove'); // To remove
+    /* Move piece elements in the DOM. */
+    const selectedPiece = this.getPieceAt(this.selected);
+    const destinationPiece = this.getPieceAt(squareNumber);
+    const timeTaken = this.setPiecePosition(selectedPiece, squareNumber, controlType);
+    if (destinationPiece) setTimeout(() => destinationPiece.remove(), timeTaken);
+    // TODO: Keep track of captured pieces.
     this.deselect();
+    return success;
   }
   /**
    * Checks if dragging with a mouse is possible for a given square,
@@ -936,6 +955,17 @@ class ChessEngine {
     }
     this.#precomputeMoves();
   }
+  #swapPlayingColor() {
+    switch(this.playingColor) {
+      case PieceColor.WHITE:
+        this.playingColor = PieceColor.BLACK;
+        break;
+      case PieceColor.BLACK:
+        this.playingColor = PieceColor.WHITE;
+        break;
+      default:
+    }
+  }
   /**
    * Calculates all valid moves for the current board state and playing color.
    */
@@ -1056,14 +1086,24 @@ class ChessEngine {
    */
   move(pointFrom, pointTo) {
     const moves = this.getMovesAtPoint(pointFrom);
-    let validMove = false;
-    moves.forEach((move) => {
+    let isValid = false;
+    let move = null;
+    /* Check is inside list of available moves. */
+    for (let i = 0; i < moves.length; i++) {
+      move = moves[i];
       if (move.to.equals(pointTo)) {
-        validMove = true;
+        isValid = true;
+        break;
       }
-    });
-    // TODO: actually move the piece
-    return validMove;
+    }
+    /* Resolve the move. */
+    if (isValid) {
+      this.#step(move);
+      this.#swapPlayingColor();
+      this.#precomputeMoves();
+      // TODO: handle checkmate.
+    }
+    return isValid;
   }
 }
 
