@@ -639,7 +639,8 @@ class Pawn extends Piece {
   move(center, grid) {
     const moves = [];
     let newPos = center.add(this.direction);
-    for (let i = 0; i < 2; i++) {
+    let limit = this.moved ? 1 : 2;
+    for (let i = 0; i < limit; i++) {
       const existingPiece = grid.valueAt(newPos);
       if (existingPiece) {
         break;
@@ -1135,6 +1136,7 @@ class ChessEngine {
       this.#step(move);
       this.#swapPlayingColor();
       this.#precomputeMoves();
+      move.piece.moved = true;
       // TODO: handle checkmate.
     }
     return isValid;
