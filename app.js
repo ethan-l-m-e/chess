@@ -245,7 +245,7 @@ class UserInterface {
   /**
    * Inserts elements for the given square numbers, 
    * each with a given class name, into a given parent element.
-   * @param {Array.<number>} squares - List of square numbers. 
+   * @param {Array<number>} squares - List of square numbers. 
    * @param {string} className - The name of the element.
    * @param {HTMLElement} container - The parent element.
    */
@@ -284,10 +284,10 @@ class UserInterface {
     const captureMoves = [];
     moves.forEach((move) => {
       switch(move.moveType) {
-        case MoveTypes.MOVE:
+        case MoveType.MOVE:
           normalMoves.push(move.to);
           break;
-        case MoveTypes.CAPTURE:
+        case MoveType.CAPTURE:
           captureMoves.push(move.to);
           break;
         default:
@@ -562,6 +562,34 @@ class Grid {
   }
 }
 
+/**
+* Types of chess moves.
+* @enum {string}
+*/
+const MoveType = {
+  /** Move that does not take a piece. */
+  MOVE: 'move',
+  /** Move that takes a opposing piece. */
+  CAPTURE: 'capture',
+}
+
+/** Class representing a chess move. */
+class Move {
+  /**
+   * Creates a chess move.
+   * @param {Piece} piece - The piece moving.
+   * @param {MoveType} moveType - What kind of move.
+   * @param {Point} from - The point to move from.
+   * @param {Point} to - The point to move to.
+   */
+  constructor(piece, moveType, from, to) {
+    this.piece = piece;
+    this.moveType = moveType;
+    this.from = from;
+    this.to = to;
+  }
+}
+
 /** Class representing a chess piece. */
 class Piece {
   /**
@@ -577,7 +605,7 @@ class Piece {
    * Calculates potential moves that the piece can take.
    * @param {Point} center - The coordinates represented as a point.
    * @param {Grid} grid - The chess grid. 
-   * @returns {Array.<Object>} A list of move objects.
+   * @returns {Array<Move>} A list of moves.
    */
   move(center, grid) {
     return [];
@@ -616,14 +644,7 @@ class Pawn extends Piece {
       if (existingPiece) {
         break;
       }
-      moves.push(
-        {
-          isCapturing: false,
-          moveType: 'move',
-          from: center,
-          to: newPos,
-        }
-      );
+      moves.push(new Move(this, MoveType.MOVE, center, newPos));
       newPos = newPos.add(this.direction);
     }
 
@@ -633,14 +654,7 @@ class Pawn extends Piece {
       const existingPiece = grid.valueAt(newPos);
       if (existingPiece) {
         if (existingPiece.color !== this.color) {
-          moves.push(
-            {
-              isCapturing: true,
-              moveType: 'capture',
-              from: center,
-              to: newPos,
-            }
-          );
+          moves.push(new Move(this, MoveType.CAPTURE, center, newPos));
         }
       }
     });
@@ -675,24 +689,11 @@ class Rook extends Piece {
       while (grid.isInside(newPos)) {
         const existingPiece = grid.valueAt(newPos);
         if (existingPiece) {
-          if (existingPiece.color !== this.color) moves.push(
-            {
-              isCapturing: true,
-              moveType: 'capture',
-              from: center,
-              to: newPos,
-            }
-          );
+          if (existingPiece.color !== this.color) moves.push(new Move(this, MoveType.CAPTURE, center,
+            newPos));
           break;
         } else {
-          moves.push(
-            {
-              isCapturing: true,
-              moveType: 'move',
-              from: center,
-              to: newPos,
-            }
-          );
+          moves.push(new Move(this, MoveType.MOVE, center, newPos));
           newPos = newPos.add(direction);
         }
       }
@@ -734,24 +735,10 @@ class Knight extends Piece {
         const existingPiece = grid.valueAt(newPos);
         if (existingPiece) { 
           if (existingPiece.color !== this.color) {
-            moves.push(
-              {
-                isCapturing: true,
-                moveType: 'capture',
-                from: center,
-                to: newPos,
-              }
-            );
+            moves.push(new Move(this, MoveType.CAPTURE, center, newPos));
           }
         } else {
-          moves.push(
-            {
-              isCapturing: true,
-              moveType: 'move',
-              from: center,
-              to: newPos,
-            }
-          );
+          moves.push(new Move(this, MoveType.MOVE, center, newPos));
         }
       }
     });
@@ -786,24 +773,11 @@ class Bishop extends Piece {
       while (grid.isInside(newPos)) {
         const existingPiece = grid.valueAt(newPos);
         if (existingPiece) {
-          if (existingPiece.color !== this.color) moves.push(
-            {
-              isCapturing: true,
-              moveType: 'capture',
-              from: center,
-              to: newPos,
-            }
-          );
+          if (existingPiece.color !== this.color) moves.push(new Move(this, MoveType.CAPTURE, center,
+            newPos));
           break;
         } else {
-          moves.push(
-            {
-              isCapturing: true,
-              moveType: 'move',
-              from: center,
-              to: newPos,
-            }
-          );
+          moves.push(new Move(this, MoveType.MOVE, center, newPos));
           newPos = newPos.add(direction);
         }
       }
@@ -844,24 +818,10 @@ class King extends Piece {
         const existingPiece = grid.valueAt(newPos);
         if (existingPiece) {
           if (existingPiece.color !== this.color) {
-            moves.push(
-              {
-                isCapturing: true,
-                moveType: 'capture',
-                from: center,
-                to: newPos,
-              }
-            );
+            moves.push(new Move(this, MoveType.CAPTURE, center, newPos));
           }
         } else {
-          moves.push(
-            {
-              isCapturing: true,
-              moveType: 'move',
-              from: center,
-              to: newPos,
-            }
-          );
+          moves.push(new Move(this, MoveType.MOVE, center, newPos));
         }
       }
     });
@@ -900,24 +860,11 @@ class Queen extends Piece {
       while (grid.isInside(newPos)) {
         const existingPiece = grid.valueAt(newPos);
         if (existingPiece) {
-          if (existingPiece.color !== this.color) moves.push(
-            {
-              isCapturing: true,
-              moveType: 'capture',
-              from: center,
-              to: newPos,
-            }
-          );
+          if (existingPiece.color !== this.color) moves.push(new Move(this, MoveType.CAPTURE, center,
+            newPos));
           break;
         } else {
-          moves.push(
-            {
-              isCapturing: true,
-              moveType: 'move',
-              from: center,
-              to: newPos,
-            }
-          );
+          moves.push(new Move(this, MoveType.MOVE, center, newPos));
           newPos = newPos.add(direction);
         }
       }
@@ -994,17 +941,6 @@ function pieceFromCode(code) {
 }
 
 /**
-* Types of chess moves.
-* @enum {string}
-*/
-const MoveTypes = {
-  /** Move that takes a opposing piece */
-  CAPTURE: 'capture',
-  /** Move that does not take a piece */
-  MOVE: 'move',
-}
-
-/**
 * Color representing black and white pieces.
 * @enum {string}
 */
@@ -1027,7 +963,7 @@ class ChessEngine {
   /**
    * Takes in an array of strings representing the layout of pieces,
    * and inserts as chess objects into the grid.
-   * @param {Array.<string>} layout - The initial layout of pieces.
+   * @param {Array<string>} layout - The initial layout of pieces.
    */
   init(layout) {
     if (layout.length !== 64) {
@@ -1087,12 +1023,12 @@ class ChessEngine {
 
   /**
    * Executes a move, changing the state in the grid.
-   * @param {Object} move - A move object.
+   * @param {Move} move - A move object.
    */
   #step(move) {
-    if (move.moveType === MoveTypes.CAPTURE) {
+    if (move.moveType === MoveType.CAPTURE) {
       this.takenPiece = this.grid.valueAt(move.to);
-    } else if (move.moveType === MoveTypes.MOVE) {
+    } else if (move.moveType === MoveType.MOVE) {
       if (this.grid.valueAt(move.to)) {
         throw new Error('Cannot step moveType.MOVE to place with existing piece');
       }
@@ -1127,7 +1063,7 @@ class ChessEngine {
       const moves = piece.move(position, this.grid);
       for (let j = 0; j < moves.length; j++) {
         const move = moves[j];
-        if (!move.isCapturing) {
+        if (move.moveType !== MoveType.CAPTURE) {
           continue;
         }
         if (kingPosition.equals(move.to)) {
@@ -1140,18 +1076,18 @@ class ChessEngine {
   
   /**
    * Undoes a previous move made by the step function.
-   * @param {Object} move - A move object.
+   * @param {Move} move - A move object.
    */
   #undo(move) {
     this.grid.moveValue(move.to, move.from);
-    if (move.moveType === MoveTypes.CAPTURE) {
+    if (move.moveType === MoveType.CAPTURE) {
       this.grid.setValueAt(move.to, this.takenPiece);
     }
   }
 
   /**
    * Retrieves the current state of the board.
-   * @returns {Array.<Object>} - The list of pieces and their point on the board.
+   * @returns {Array<Object>} - The list of pieces and their point on the board.
    */
   getState() {
     const positions = [];
@@ -1170,7 +1106,7 @@ class ChessEngine {
   /**
    * Retrieves computed valid moves at a point.
    * @param {Point} point - The queried point.
-   * @returns {Array.<Object>} A list of move objects.
+   * @returns {Array<Move>} A list of moves.
    */
   getMovesAtPoint(point) {
     return this.moveArray[point.x + point.y * 8];
@@ -1253,7 +1189,7 @@ class ChessEngineAdapter {
    * Requests available moves from chess engine,
    * with move objects adapted to use square number instead of point.
    * @param {number} squareNumber - A square number.
-   * @returns {Array.<Object>} List of move objects.
+   * @returns {Array<Object>} List of move objects.
    */
   getMovesAtSquareNumber(squareNumber) {
     const point = this.pointFromSquareNumber(squareNumber);
@@ -1261,9 +1197,8 @@ class ChessEngineAdapter {
     const adaptedArray = [];
     moves.forEach((move) => {
       adaptedArray.push(
-        /* Creates an object copy, do not modify original moves */
         {
-          isCapturing: move.isCapturing,
+          piece: move.piece,
           moveType: move.moveType,
           from: this.squareNumberFromPoint(move.from),
           to: this.squareNumberFromPoint(move.to),
