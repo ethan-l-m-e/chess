@@ -285,6 +285,7 @@ class UserInterface {
     moves.forEach((move) => {
       switch(move.moveType) {
         case MoveType.MOVE:
+        case MoveType.CASTLE:
           normalMoves.push(move.to);
           break;
         case MoveType.CAPTURE:
@@ -354,7 +355,7 @@ class UserInterface {
    * @returns {boolean} True on success.
    */
   requestMove(squareNumber, controlType) {
-    const success = this.engine.move(this.selected, squareNumber);
+    const {success, move} = this.engine.move(this.selected, squareNumber);
     if (!success) {
       /* Handle fail condition. */
       switch (controlType) {
@@ -378,6 +379,9 @@ class UserInterface {
     const destinationPiece = this.#getPieceAt(squareNumber);
     const timeTaken = this.#setPiecePosition(selectedPiece, squareNumber, controlType);
     if (destinationPiece) setTimeout(() => destinationPiece.remove(), timeTaken);
+    if (move.moveType === MoveType.CASTLE) {
+      this.#setPiecePosition(this.#getPieceAt(move.rookFrom), move.rookTo, ControlType.CLICK);
+    }
     // TODO: Keep track of captured pieces.
     this.deselect();
     return success;
@@ -571,6 +575,8 @@ const MoveType = {
   MOVE: 'move',
   /** Move that takes a opposing piece. */
   CAPTURE: 'capture',
+  /** Castling of king and rook. */
+  CASTLE: 'castle',
 }
 
 /** Class representing a chess move. */
@@ -587,6 +593,17 @@ class Move {
     this.moveType = moveType;
     this.from = from;
     this.to = to;
+  }
+}
+
+/** Class representing special castle move. */
+class CastleMove extends Move {
+  constructor(piece, moveType, from, to, rook, rookFrom, rookTo) {
+    super(piece, moveType, from, to);
+    this.rook = rook
+    this.rookFrom = rookFrom;
+    this.rookTo = rookTo;
+    this.kingPositions = [from, rookTo, to];
   }
 }
 
@@ -808,11 +825,16 @@ class King extends Piece {
       new Point(0, 1),
       new Point(-1, 1),
     ];
+    this.left = color === PieceColor.WHITE ? new Point(-1, 0) : new Point(1, 0);
+    this.right = color === PieceColor.WHITE ? new Point(1, 0) : new Point(-1, 0);
+    this.castleLeftOffset = color === PieceColor.WHITE ? new Point(-2, 0) : new Point(2, 0);
+    this.castleRightOffset = color === PieceColor.WHITE ? new Point(2, 0) : new Point(-2, 0);
   }
 
   /** @override */
   move(center, grid) {
     const moves = [];
+    /* Regular moves. */
     this.directions.forEach((direction) => {
       const newPos = center.add(direction);
       if (grid.isInside(newPos)) {
@@ -826,6 +848,43 @@ class King extends Piece {
         }
       }
     });
+    /* Castling. */
+    if (this.moved === false) {
+      /* Left side castling. */
+      let newPos = center.add(this.left);
+      while (grid.isInside(newPos)) {
+        const existingPiece = grid.valueAt(newPos);
+        /* Existing piece between king and rook. */
+        if (existingPiece !== undefined && !(existingPiece instanceof Rook)) break;
+        /* Found rook that has not moved. */
+        if (existingPiece instanceof Rook && !existingPiece.moved) {
+          const rookFrom = newPos;
+          const rookTo = center.add(this.left);
+          const kingTo = center.add(this.castleLeftOffset);
+          moves.push(new CastleMove(this, MoveType.CASTLE, center, kingTo, existingPiece, rookFrom, rookTo));
+          break;
+        }
+        /* Nothing found, look at next square. */
+        newPos = newPos.add(this.left);
+      }
+      /* Right side castling. */
+      newPos = center.add(this.right);
+      while (grid.isInside(newPos)) {
+        const existingPiece = grid.valueAt(newPos);
+        /* Existing piece between king and rook. */
+        if (existingPiece !== undefined && !(existingPiece instanceof Rook)) break;
+        /* Found rook that has not moved. */
+        if (existingPiece instanceof Rook && !existingPiece.moved) {
+          const rookFrom = newPos;
+          const rookTo = center.add(this.right);
+          const kingTo = center.add(this.castleRightOffset);
+          moves.push(new CastleMove(this, MoveType.CASTLE, center, kingTo, existingPiece, rookFrom, rookTo));
+          break;
+        }
+        /* Nothing found, look at next square. */
+        newPos = newPos.add(this.right);
+      }
+    }
     return moves;
   }
 }
@@ -1012,7 +1071,7 @@ class ChessEngine {
       moves.forEach((move) => {
         this.#step(move);
         if (piece.color === this.playingColor &&
-          this.#validatePosition()) {
+          this.#validatePosition(move)) {
           validMoves.push(move);
         }
         this.#undo(move);
@@ -1033,6 +1092,8 @@ class ChessEngine {
       if (this.grid.valueAt(move.to)) {
         throw new Error('Cannot step moveType.MOVE to place with existing piece');
       }
+    } else if (move.moveType === MoveType.CASTLE) {
+      this.grid.moveValue(move.rookFrom, move.rookTo);
     }
     this.grid.moveValue(move.from, move.to);
   }
@@ -1042,7 +1103,7 @@ class ChessEngine {
    * by making sure that same color king is not left in check.
    * @returns {boolean} True if state is valid.
    */
-  #validatePosition() {
+  #validatePosition(move) {
     let kingPosition = undefined;
     const enemyPositions = [];
     this.grid.each((center, piece) => {
@@ -1061,14 +1122,20 @@ class ChessEngine {
     for (let i = 0; i < enemyPositions.length; i++) {
       const position = enemyPositions[i];
       const piece = this.grid.valueAt(position);
-      const moves = piece.move(position, this.grid);
-      for (let j = 0; j < moves.length; j++) {
-        const move = moves[j];
-        if (move.moveType !== MoveType.CAPTURE) {
-          continue;
-        }
-        if (kingPosition.equals(move.to)) {
-          return false;
+      const enemyMoves = piece.move(position, this.grid);
+      for (let j = 0; j < enemyMoves.length; j++) {
+        const enemyMove = enemyMoves[j];
+        /* Enemy move cannot capture. */
+        if (enemyMove.moveType !== MoveType.CAPTURE) continue;
+        /* Enemy move lands on king. */
+        if (kingPosition.equals(enemyMove.to)) return false;
+        /* Check castling rules. */
+        if (move.moveType === MoveType.CASTLE) {
+          for (let i = 0; i < move.kingPositions.length; i++) {
+            const kingPosition = move.kingPositions[i];
+            /* Enemy captures square travelled by king. */
+            if (kingPosition.equals(enemyMove.to)) return false;
+          }
         }
       }
     }
@@ -1083,6 +1150,8 @@ class ChessEngine {
     this.grid.moveValue(move.to, move.from);
     if (move.moveType === MoveType.CAPTURE) {
       this.grid.setValueAt(move.to, this.takenPiece);
+    } else if (move.moveType === MoveType.CASTLE) {
+      this.grid.moveValue(move.rookTo, move.rookFrom);
     }
   }
 
@@ -1134,12 +1203,16 @@ class ChessEngine {
     /* Resolve the move. */
     if (isValid) {
       this.#step(move);
+      move.piece.moved = true;
+      if (move.moveType === MoveType.CASTLE) move.rook.moved = true;
       this.#swapPlayingColor();
       this.#precomputeMoves();
-      move.piece.moved = true;
       // TODO: handle checkmate.
     }
-    return isValid;
+    return {
+      success: isValid, 
+      move: move,
+    };
   }
 }
 
@@ -1172,6 +1245,34 @@ class ChessEngineAdapter {
     const col = Math.floor(squareNumber / 8);
     return new Point(row, col);
   }
+
+  /**
+   * Transforms a move from using points to square numbers.
+   * @param {Move} move - The move to be modified.
+   * @returns {Object} A new object with properties replaced.
+   */
+  #adaptMove(move) {
+    if (!move) return null;
+    switch (move.moveType) {
+      case MoveType.CASTLE:
+        return {
+          piece: move.piece,
+          moveType: move.moveType,
+          from: this.squareNumberFromPoint(move.from),
+          to: this.squareNumberFromPoint(move.to),
+          rook: move.rook,
+          rookFrom: this.squareNumberFromPoint(move.rookFrom),
+          rookTo: this.squareNumberFromPoint(move.rookTo),
+        }
+      default:
+        return {
+          piece: move.piece,
+          moveType: move.moveType,
+          from: this.squareNumberFromPoint(move.from),
+          to: this.squareNumberFromPoint(move.to),
+        }
+    }
+  } 
 
   getState() {
     const positions = this.engine.getState();
@@ -1214,24 +1315,28 @@ class ChessEngineAdapter {
    * Attempts move in chess engine.
    * @param {number} squareFrom - The origin square number.
    * @param {number} squareTo - The destination square number.
-   * @returns {boolean} True if move was successful.
+   * @returns {Object} Contains success status, and the move object if successful.
    */
   move(squareFrom, squareTo) {
     const pointFrom = this.pointFromSquareNumber(squareFrom);
     const pointTo = this.pointFromSquareNumber(squareTo);
-    return this.engine.move(pointFrom, pointTo);
+    const res = this.engine.move(pointFrom, pointTo);
+    return {
+      success: res.success,
+      move: this.#adaptMove(res.move),
+    }
   }
 }
 
 const layout = [
-  'br', 'bn', 'bb', '  ', 'bq', 'bb', 'bn', 'br',
+  'br', 'bn', 'bb', 'bq', 'bk', 'bb', 'bn', 'br',
   'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp',
   '  ', '  ', '  ', '  ', '  ', '  ', '  ', '  ',
-  '  ', '  ', '  ', 'wb', '  ', '  ', '  ', '  ',
-  '  ', '  ', '  ', 'wq', '  ', 'bk', 'wn', '  ',
-  '  ', '  ', 'wn', '  ', 'bb', '  ', '  ', '  ',
-  'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp',
-  'wr', 'wn', 'wb', 'wk', 'wq', 'wb', 'wn', 'wr',
+  '  ', '  ', '  ', '  ', '  ', '  ', '  ', '  ',
+  '  ', '  ', '  ', 'wb', '  ', '  ', 'bq', '  ',
+  '  ', 'wn', 'wb', 'wq', '  ', '  ', '  ', '  ',
+  'wp', 'wp', 'wp', '  ', '  ', 'wp', 'wp', 'wp',
+  'wr', '  ', '  ', '  ', 'wk', '  ', '  ', 'wr',
 ];
 
 const engine = new ChessEngine();
