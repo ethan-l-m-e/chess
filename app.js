@@ -1274,6 +1274,10 @@ class ChessEngineAdapter {
     }
   } 
 
+  /**
+   * Gives a simplified list containing positions of pieces on the board.
+   * @returns {Array<Object>} Each contains a piece and square number.
+   */
   getState() {
     const positions = this.engine.getState();
     const adaptedArray = [];
