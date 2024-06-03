@@ -1152,11 +1152,11 @@ class ChessEngine {
     for (let i = 0; i < enemyPositions.length; i++) {
       const position = enemyPositions[i];
       const piece = this.grid.valueAt(position);
-      const enemyMoves = piece.move(position, this.grid);
+      const enemyMoves = piece.move(position, this.grid, this.lastMove);
       for (let j = 0; j < enemyMoves.length; j++) {
         const enemyMove = enemyMoves[j];
-        /* Enemy move cannot capture. */
-        if (enemyMove.moveType !== MoveType.CAPTURE) continue;
+        /* Enemy move cannot capture. (only use for non-castling move) */
+        if (enemyMove.moveType !== MoveType.CAPTURE && move.moveType !== MoveType.CASTLE) continue;
         /* Enemy move lands on king. */
         if (kingPosition.equals(enemyMove.to)) return false;
         /* Check castling rules. */
@@ -1374,7 +1374,7 @@ class ChessEngineAdapter {
 }
 
 const layout = [
-  'br', '  ', '  ', '  ', 'bk', '  ', '  ', 'br',
+  'br', '  ', '  ', '  ', 'br', '  ', 'bk', '  ',
   'bp', 'bp', 'bp', 'bp', '  ', 'bp', 'bp', 'bp',
   '  ', 'bn', 'bb', '  ', '  ', '  ', '  ', '  ',
   '  ', '  ', '  ', '  ', '  ', '  ', '  ', '  ',
