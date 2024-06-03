@@ -289,6 +289,7 @@ class UserInterface {
           normalMoves.push(move.to);
           break;
         case MoveType.CAPTURE:
+        case MoveType.EN_PASSANT:
           captureMoves.push(move.to);
           break;
         default:
@@ -376,7 +377,8 @@ class UserInterface {
     }
     /* Move piece elements in the DOM. */
     const selectedPiece = this.#getPieceAt(this.selected);
-    const destinationPiece = this.#getPieceAt(squareNumber);
+    let destinationPiece = this.#getPieceAt(squareNumber);
+    if (move.moveType === MoveType.EN_PASSANT) destinationPiece = this.#getPieceAt(move.captureAt);
     const timeTaken = this.#setPiecePosition(selectedPiece, squareNumber, controlType);
     if (destinationPiece) setTimeout(() => destinationPiece.remove(), timeTaken);
     if (move.moveType === MoveType.CASTLE) {
@@ -577,6 +579,8 @@ const MoveType = {
   CAPTURE: 'capture',
   /** Castling of king and rook. */
   CASTLE: 'castle',
+  /** En-passant capture. */
+  EN_PASSANT: 'en-passant',
 }
 
 /** Class representing a chess move. */
@@ -607,6 +611,14 @@ class CastleMove extends Move {
   }
 }
 
+/** Class representing special en-passant move */
+class EnpassantMove extends Move {
+  constructor(piece, moveType, from, to, captureAt) {
+    super(piece, moveType, from, to);
+    this.captureAt = captureAt;
+  }
+}
+
 /** Class representing a chess piece. */
 class Piece {
   /**
@@ -621,10 +633,11 @@ class Piece {
   /**
    * Calculates potential moves that the piece can take.
    * @param {Point} center - The coordinates represented as a point.
-   * @param {Grid} grid - The chess grid. 
+   * @param {Grid} grid - The chess grid.
+   * @param {Move|null} lastMove - The previous move recorded.
    * @returns {Array<Move>} A list of moves.
    */
-  move(center, grid) {
+  move(center, grid, lastMove) {
     return [];
   }
 }
@@ -650,10 +663,14 @@ class Pawn extends Piece {
       new Point(-1, 1),
       new Point(1, 1),
     ];
+    this.sides = [
+      new Point(-1, 0),
+      new Point(1, 0),
+    ];
   }
 
   /** @override */
-  move(center, grid) {
+  move(center, grid, lastMove) {
     const moves = [];
     let newPos = center.add(this.direction);
     let limit = this.moved ? 1 : 2;
@@ -665,7 +682,6 @@ class Pawn extends Piece {
       moves.push(new Move(this, MoveType.MOVE, center, newPos));
       newPos = newPos.add(this.direction);
     }
-
     /* Diagonal capture */
     this.capturingDirections.forEach((direction) => {
       const newPos = center.add(direction);
@@ -676,6 +692,17 @@ class Pawn extends Piece {
         }
       }
     });
+    /* En-passant */
+    if (lastMove && lastMove.piece instanceof Pawn && lastMove.piece.color !== this.color) {
+      this.sides.forEach((side) => {
+        const sidePos = center.add(side);
+        const expectedStartPos = sidePos.add(this.direction).add(this.direction);
+        if (sidePos.equals(lastMove.to) && expectedStartPos.equals(lastMove.from)) {
+          const endPos = sidePos.add(this.direction);
+          moves.push(new EnpassantMove(this, MoveType.EN_PASSANT, center, endPos, sidePos));
+        }
+      });
+    }
     return moves;
   }
 }
@@ -1018,6 +1045,7 @@ class ChessEngine {
     this.playingColor = PieceColor.WHITE;
     this.takenPiece = null;
     this.moveArray = [];
+    this.lastMove = null;
   }
 
   /**
@@ -1066,7 +1094,7 @@ class ChessEngine {
     let validMoveCount = 0;
     this.grid.each((center, piece) => {
       if (!piece) return;
-      const moves = piece.move(center, this.grid);
+      const moves = piece.move(center, this.grid, this.lastMove);
       const validMoves = [];
       moves.forEach((move) => {
         this.#step(move);
@@ -1094,6 +1122,8 @@ class ChessEngine {
       }
     } else if (move.moveType === MoveType.CASTLE) {
       this.grid.moveValue(move.rookFrom, move.rookTo);
+    } else if (move.moveType === MoveType.EN_PASSANT) {
+      this.takenPiece = this.grid.valueAt(move.captureAt);
     }
     this.grid.moveValue(move.from, move.to);
   }
@@ -1152,6 +1182,8 @@ class ChessEngine {
       this.grid.setValueAt(move.to, this.takenPiece);
     } else if (move.moveType === MoveType.CASTLE) {
       this.grid.moveValue(move.rookTo, move.rookFrom);
+    } else if (move.moveType === MoveType.EN_PASSANT) {
+      this.grid.setValueAt(move.captureAt, this.takenPiece);
     }
   }
 
@@ -1205,6 +1237,7 @@ class ChessEngine {
       this.#step(move);
       move.piece.moved = true;
       if (move.moveType === MoveType.CASTLE) move.rook.moved = true;
+      this.lastMove = move;
       this.#swapPlayingColor();
       this.#precomputeMoves();
       // TODO: handle checkmate.
@@ -1263,6 +1296,14 @@ class ChessEngineAdapter {
           rook: move.rook,
           rookFrom: this.squareNumberFromPoint(move.rookFrom),
           rookTo: this.squareNumberFromPoint(move.rookTo),
+        }
+      case MoveType.EN_PASSANT:
+        return {
+          piece: move.piece,
+          moveType: move.moveType,
+          from: this.squareNumberFromPoint(move.from),
+          to: this.squareNumberFromPoint(move.to),
+          captureAt: this.squareNumberFromPoint(move.captureAt),
         }
       default:
         return {
@@ -1333,11 +1374,11 @@ class ChessEngineAdapter {
 }
 
 const layout = [
-  'br', 'bn', 'bb', 'bq', 'bk', 'bb', 'bn', 'br',
-  'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp',
+  'br', '  ', '  ', '  ', 'bk', '  ', '  ', 'br',
+  'bp', 'bp', 'bp', 'bp', '  ', 'bp', 'bp', 'bp',
+  '  ', 'bn', 'bb', '  ', '  ', '  ', '  ', '  ',
   '  ', '  ', '  ', '  ', '  ', '  ', '  ', '  ',
-  '  ', '  ', '  ', '  ', '  ', '  ', '  ', '  ',
-  '  ', '  ', '  ', 'wb', '  ', '  ', 'bq', '  ',
+  '  ', '  ', '  ', 'wb', 'bp', '  ', 'bq', '  ',
   '  ', 'wn', 'wb', 'wq', '  ', '  ', '  ', '  ',
   'wp', 'wp', 'wp', '  ', '  ', 'wp', 'wp', 'wp',
   'wr', '  ', '  ', '  ', 'wk', '  ', '  ', 'wr',
