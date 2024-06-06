@@ -978,6 +978,8 @@ class King extends Piece {
           const rookFrom = newPos;
           const rookTo = center.add(this.left);
           const kingTo = center.add(this.castleLeftOffset);
+          if(grid.valueAt(kingTo)) break;
+          if(grid.valueAt(rookTo)) break;
           moves.push(new CastleMove(this, MoveType.CASTLE, center, kingTo, existingPiece, rookFrom, rookTo));
           break;
         }
@@ -995,6 +997,8 @@ class King extends Piece {
           const rookFrom = newPos;
           const rookTo = center.add(this.right);
           const kingTo = center.add(this.castleRightOffset);
+          if(grid.valueAt(kingTo)) break;
+          if(grid.valueAt(rookTo)) break;
           moves.push(new CastleMove(this, MoveType.CASTLE, center, kingTo, existingPiece, rookFrom, rookTo));
           break;
         }
