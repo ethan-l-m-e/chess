@@ -759,10 +759,12 @@ class Pawn extends Piece {
 
   /** @override */
   move(center, grid, lastMove) {
+    /* Forward move. */
     const moves = [];
     let newPos = center.add(this.direction);
     let limit = this.moved ? 1 : 2;
     for (let i = 0; i < limit; i++) {
+      if (!grid.isInside(newPos)) break;
       const existingPiece = grid.valueAt(newPos);
       if (existingPiece) {
         break;
@@ -770,7 +772,7 @@ class Pawn extends Piece {
       moves.push(new Move(this, MoveType.MOVE, center, newPos));
       newPos = newPos.add(this.direction);
     }
-    /* Diagonal capture */
+    /* Diagonal capture. */
     this.capturingDirections.forEach((direction) => {
       const newPos = center.add(direction);
       const existingPiece = grid.valueAt(newPos);
@@ -780,7 +782,7 @@ class Pawn extends Piece {
         }
       }
     });
-    /* En-passant */
+    /* En-passant. */
     if (lastMove && lastMove.piece instanceof Pawn && lastMove.piece.color !== this.color) {
       this.sides.forEach((side) => {
         const sidePos = center.add(side);
