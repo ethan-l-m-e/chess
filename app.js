@@ -1132,13 +1132,16 @@ const PieceColor = {
 
 /** Class managing the chess game state. */
 class ChessEngine {
+  #width = 8;
+  #height = 8;
+  #size = this.#width * this.#height;
+
   /** Create a chess engine. */
   constructor() {
-    const grid = new Grid(8, 8);
-    this.grid = grid;
+    this.grid = new Grid(this.#width, this.#height);
+    this.moveArray = new Array(this.#width * this.#height);
     this.playingColor = PieceColor.WHITE;
     this.takenPiece = null;
-    this.moveArray = [];
     this.lastMove = null;
   }
 
@@ -1148,17 +1151,26 @@ class ChessEngine {
    * @param {Array<string>} layout - The initial layout of pieces.
    */
   init(layout) {
-    if (layout.length !== 64) {
+    if (layout.length !== this.#size) {
       throw new Error('Invalid plan size');
     }
-    for (let i = 0; i < layout.length; i++) {
-      const row = i % 8;
-      const col = Math.floor(i / 8);
+    for (let i = 0; i < this.#size; i++) {
+      const row = i % this.#width;
+      const col = Math.floor(i / this.#width);
       const center = new Point(row, col);
       const piece = pieceFromCode(layout[i]);
       this.grid.setValueAt(center, piece);
     }
     this.#precomputeMoves();
+  }
+
+  /**
+   * Clears the lists of moves from the move array.
+   */
+  #resetMoveArray() {
+    for (let i = 0; i < this.#size; i++) {
+      this.moveArray[i] = [];
+    }
   }
 
   /**
@@ -1181,9 +1193,8 @@ class ChessEngine {
    */
   #precomputeMoves() {
     /* Reset the previous precomputed moves */
-    for (let i = 0; i < 64; i++) {
-      this.moveArray[i] = [];
-    }
+    this.#resetMoveArray();
+
     /* Calculate for current board state */
     let validMoveCount = 0;
     this.grid.each((center, piece) => {
@@ -1200,7 +1211,7 @@ class ChessEngine {
         this.#undo(move);
       });
       validMoveCount += validMoves.length;
-      this.moveArray[center.x + center.y * 8] = validMoves;
+      this.moveArray[center.x + center.y * this.#width] = validMoves;
     });
   }
 
@@ -1314,7 +1325,7 @@ class ChessEngine {
    * @returns {Array<Move>} A list of moves.
    */
   getMovesAtPoint(point) {
-    return this.moveArray[point.x + point.y * 8];
+    return this.moveArray[point.x + point.y * this.#width];
   }
 
   /**
