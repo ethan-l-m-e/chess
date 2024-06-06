@@ -71,3 +71,19 @@ html {
   width: calc(var(--board-length) / 8);
   height: calc(var(--board-length) / 8);
 }
+
+#promotion-window {
+  z-index: 4; /* To be above everything. */
+  display: none;
+  position: absolute;
+  flex-direction: column;
+  border: 1px solid black;
+  box-shadow: 5px 5px;
+}
+
+.promotion-option {
+  background-color: white;
+  cursor: pointer;
+  width: calc(var(--board-length) / 8);
+  height: calc(var(--board-length) / 8);
+}

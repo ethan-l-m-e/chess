@@ -92,10 +92,11 @@ function handleMouseDown(event) {
 
   const mousePosition = getMousePositionInElement(board, event);
   const squareNumber = getSquareNumberOfMouse(mousePosition);
-  if (ui.canDrag(squareNumber)) {
+  if (ui.canDrag(squareNumber) && !ui.waitingForPromotion) {
     ui.beginDrag(squareNumber, event);
     ui.select(squareNumber);
   } else if (ui.selected !== null) { // Make sure to check null, as selected can be 0.
+    if (ui.waitingForPromotion || ui.checkPromotion(squareNumber)) return;
     ui.requestMove(squareNumber, ControlType.CLICK);
   }
 }
@@ -112,6 +113,7 @@ function handleMouseUp(event) {
     ui.endDrag();
     /* Blocks drop from outside board */
     if (eventInsideElement(board, event)) {
+      if (ui.waitingForPromotion || ui.checkPromotion(squareNumber)) return;
       ui.requestMove(squareNumber, ControlType.DROP);
     }
   }
@@ -173,16 +175,31 @@ class UserInterface {
     this.moveMarkers = document.getElementById('move-markers');
     this.captureMarkers = document.getElementById('capture-markers');
     this.pieces = document.getElementById('pieces');
+    this.promotionWindow = document.getElementById('promotion-window');
     /* Variables for selecting and moving pieces. */
     this.undraggableSquares = [];
     this.selected = null;
     this.hadSelected = false;
     this.hadSelectedSquareNumber = null;
+    this.waitingForPromotion = false;
     /* Variables for dragging with mouse. */
     this.draggedPiece = null;
     this.isDragging = false;
     /* Bind function to this class to give access to class properties. */
     this.dragFunction = this.#dragPiece.bind(this);
+  }
+
+  /**
+   * Creates a generic div element with provided class names.
+   * @param {Array<string>} classList - List of class names to add.
+   * @returns {HTMLElement} The created element.
+   */
+  #createElement(classList) {
+    const element = document.createElement('div');
+    classList.forEach((className) => {
+      element.classList.add(className);
+    });
+    return element;
   }
 
   /**
@@ -301,8 +318,7 @@ class UserInterface {
 
     this.#insertBoardElements(normalMoves, UiClass.MOVE, this.moveMarkers);
     this.#insertBoardElements(captureMoves, UiClass.CAPTURE, this.moveMarkers);
-    this.#insertBoardElements([squareNumber], UiClass.HIGHLIGHT, 
-      this.highlights);
+    this.#insertBoardElements([squareNumber], UiClass.HIGHLIGHT, this.highlights);
   }
 
   /**
@@ -349,14 +365,79 @@ class UserInterface {
   }
 
   /**
+   * When attempting to move piece to new square, check if move results in promotion and opens promotion window.
+   * @param {number} squareNumber - The destination square number.
+   * @returns {boolean} True if promotion will take place.
+   */
+  checkPromotion(squareNumber) {
+    /* Checks with engine if promotion will occur on this square. */
+    const isPromotion = this.engine.isPromotion(this.selected, squareNumber);
+    if (isPromotion) {
+      this.#openPromotionWindow(squareNumber);
+    }
+    return isPromotion;
+  }
+
+  /**
+   * Inserts the piece options into promotion window, thereby 'opening' it.
+   * @param {number} squareNumber - The destination square number.
+   */
+  #openPromotionWindow(squareNumber) {
+    /* Set position. */
+    const boardLength = getBoardLength();
+    const squareLength = boardLength / 8;
+    const x = squareNumber % 8;
+    const y = Math.min(Math.floor(squareNumber / 8), 4);
+    this.promotionWindow.style.transform = `translate(${x * squareLength}px, ` +
+      `${y * squareLength}px)`;
+    this.promotionWindow.style.display = 'flex';
+    /* Fill in options. */
+    const playingColor = this.engine.getPlayingColor();
+    const optionClass = 'promotion-option';
+    const queenCode = codeFromPiece(new Queen(playingColor));
+    const knightCode = codeFromPiece(new Knight(playingColor));
+    const rookCode = codeFromPiece(new Rook(playingColor));
+    const bishopCode = codeFromPiece(new Bishop(playingColor));
+    const queen = this.#createElement([optionClass, queenCode]);
+    const knight = this.#createElement([optionClass, knightCode]);
+    const rook = this.#createElement([optionClass, rookCode]);
+    const bishop = this.#createElement([optionClass, bishopCode]);
+    queen.addEventListener('click', () => {this.#handlePromotion(squareNumber, queenCode)});
+    knight.addEventListener('click', () => {this.#handlePromotion(squareNumber, knightCode)});
+    rook.addEventListener('click', () => {this.#handlePromotion(squareNumber, rookCode)});
+    bishop.addEventListener('click', () => {this.#handlePromotion(squareNumber, bishopCode)});
+    this.promotionWindow.appendChild(queen);
+    this.promotionWindow.appendChild(knight);
+    this.promotionWindow.appendChild(rook);
+    this.promotionWindow.appendChild(bishop);
+    this.waitingForPromotion = true;
+  }
+
+  /**
+   * Carries out the promotion move after piece is selected from the promotion window.
+   * @param {number} squareNumber - The destination square number.
+   * @param {string} code - The piece code representing the piece to promote to.
+   */
+  #handlePromotion(squareNumber, code) {
+    /* Request move from engine. */
+    this.requestMove(squareNumber, ControlType.CLICK, code);
+
+    /* Cleanup */
+    this.waitingForPromotion = false;
+    this.promotionWindow.removeAttribute('style');
+    this.promotionWindow.replaceChildren();
+  }
+
+  /**
    * Tries to make a move from the selected square to a given square number.
    * If successful, carry out the move. Else, handle a deselect process.
    * @param {number} squareNumber - The destination square number.
    * @param {!ControlType} controlType - A click or drop.
+   * @param {PieceCode|undefined} promotionPieceCode - The type of piece if promoting, else undefined.
    * @returns {boolean} True on success.
    */
-  requestMove(squareNumber, controlType) {
-    const {success, move} = this.engine.move(this.selected, squareNumber);
+  requestMove(squareNumber, controlType, promotionPieceCode) {
+    const {success, move} = this.engine.move(this.selected, squareNumber, promotionPieceCode);
     if (!success) {
       /* Handle fail condition. */
       switch (controlType) {
@@ -381,8 +462,14 @@ class UserInterface {
     if (move.moveType === MoveType.EN_PASSANT) destinationPiece = this.#getPieceAt(move.captureAt);
     const timeTaken = this.#setPiecePosition(selectedPiece, squareNumber, controlType);
     if (destinationPiece) setTimeout(() => destinationPiece.remove(), timeTaken);
+    /* Cleanup after special moves. */
     if (move.moveType === MoveType.CASTLE) {
       this.#setPiecePosition(this.#getPieceAt(move.rookFrom), move.rookTo, ControlType.CLICK);
+    } else if (promotionPieceCode) {
+      const piece = this.#createPiece(promotionPieceCode);
+      selectedPiece.remove();
+      this.#setPiecePosition(piece, move.to, ControlType.DROP);
+      this.pieces.appendChild(piece);
     }
     // TODO: Keep track of captured pieces.
     this.deselect();
@@ -549,6 +636,7 @@ class Grid {
    * @param {Point} to - The destination point.
    */
   moveValue(from, to) {
+    if (from.equals(to)) return;
     this.setValueAt(to, this.valueAt(from));
     this.setValueAt(from, undefined);
   }
@@ -1094,6 +1182,7 @@ class ChessEngine {
     let validMoveCount = 0;
     this.grid.each((center, piece) => {
       if (!piece) return;
+      if (piece.color !== this.playingColor) return;
       const moves = piece.move(center, this.grid, this.lastMove);
       const validMoves = [];
       moves.forEach((move) => {
@@ -1206,6 +1295,14 @@ class ChessEngine {
   }
 
   /**
+   * Gets the current color to move.
+   * @returns {PieceColor} The color as a string.
+   */
+  getPlayingColor() {
+    return this.playingColor;
+  }
+
+  /**
    * Retrieves computed valid moves at a point.
    * @param {Point} point - The queried point.
    * @returns {Array<Move>} A list of moves.
@@ -1215,12 +1312,37 @@ class ChessEngine {
   }
 
   /**
+   * To check if piece is a pawn of playing color and will promote by reaching last rank of board.
+   * @param {Point} from - The origin point.
+   * @param {Point} to - The destination point.
+   * @returns {boolean} - True promotion will happen.
+   */
+  isPromotion(from, to) {
+    const piece = this.grid.valueAt(from);
+    if (piece instanceof Pawn &&
+        piece.color === this.playingColor && 
+        (to.y === 7 || to.y === 0)) {
+
+      /* Verify pawn has requested move. */
+      let moves = this.getMovesAtPoint(from);
+      for (let i = 0; i < moves.length; i++) {
+        const move = moves[i];
+        if (move.to.equals(to)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
    * Moves piece from one point to another.
    * @param {Point} pointFrom - The origin point.
    * @param {Point} pointTo - The destination point.
+   * @param {string} promotionCode - The piece code if promoting a pawn.
    * @returns {boolean} True if move was successful.
    */
-  move(pointFrom, pointTo) {
+  move(pointFrom, pointTo, promotionCode) {
     const moves = this.getMovesAtPoint(pointFrom);
     let isValid = false;
     let move = null;
@@ -1234,9 +1356,21 @@ class ChessEngine {
     }
     /* Resolve the move. */
     if (isValid) {
-      this.#step(move);
+      this.#step(move, true);
+
+      /* Cleanup after step. */
       move.piece.moved = true;
       if (move.moveType === MoveType.CASTLE) move.rook.moved = true;
+      else if (promotionCode) {
+        if (!(move.piece instanceof Pawn)) {
+          throw new Error('Trying to promote non-pawn piece.');
+        }
+        const promotionPiece = pieceFromCode(promotionCode);
+        this.grid.setValueAt(move.to, promotionPiece);
+        promotionPiece.moved = true;
+      }
+
+      /* Preparation for next move. */
       this.lastMove = move;
       this.#swapPlayingColor();
       this.#precomputeMoves();
@@ -1334,6 +1468,13 @@ class ChessEngineAdapter {
   }
 
   /**
+   * Get the current color to move.
+   */
+  getPlayingColor() {
+    return this.engine.getPlayingColor();
+  }
+
+  /**
    * Requests available moves from chess engine,
    * with move objects adapted to use square number instead of point.
    * @param {number} squareNumber - A square number.
@@ -1357,15 +1498,28 @@ class ChessEngineAdapter {
   }
 
   /**
+   * Checks promotion in chess engine.
+   * @param {number} squareFrom - The origin square number.
+   * @param {number} squareTo - The destination square number.
+   * @returns {boolean} True if promotion will happen.
+   */
+  isPromotion(squareFrom, squareTo) {
+    const pointFrom = this.pointFromSquareNumber(squareFrom);
+    const pointTo = this.pointFromSquareNumber(squareTo);
+    return this.engine.isPromotion(pointFrom, pointTo);
+  }
+
+  /**
    * Attempts move in chess engine.
    * @param {number} squareFrom - The origin square number.
    * @param {number} squareTo - The destination square number.
+   * @param {string} promotionCode - The piece code if promoting a pawn.
    * @returns {Object} Contains success status, and the move object if successful.
    */
-  move(squareFrom, squareTo) {
+  move(squareFrom, squareTo, promotionCode) {
     const pointFrom = this.pointFromSquareNumber(squareFrom);
     const pointTo = this.pointFromSquareNumber(squareTo);
-    const res = this.engine.move(pointFrom, pointTo);
+    const res = this.engine.move(pointFrom, pointTo, promotionCode);
     return {
       success: res.success,
       move: this.#adaptMove(res.move),
@@ -1374,14 +1528,14 @@ class ChessEngineAdapter {
 }
 
 const layout = [
-  'br', '  ', '  ', '  ', 'br', '  ', 'bk', '  ',
-  'bp', 'bp', 'bp', 'bp', '  ', 'bp', 'bp', 'bp',
+  'br', '  ', '  ', '  ', '  ', 'br', 'bk', '  ',
+  'bp', 'bp', 'bp', 'wp', '  ', 'bp', 'bp', 'bp',
   '  ', 'bn', 'bb', '  ', '  ', '  ', '  ', '  ',
   '  ', '  ', '  ', '  ', '  ', '  ', '  ', '  ',
   '  ', '  ', '  ', 'wb', 'bp', '  ', 'bq', '  ',
   '  ', 'wn', 'wb', 'wq', '  ', '  ', '  ', '  ',
   'wp', 'wp', 'wp', '  ', '  ', 'wp', 'wp', 'wp',
-  'wr', '  ', '  ', '  ', 'wk', '  ', '  ', 'wr',
+  'wr', '  ', '  ', '  ', 'wk', 'wr', '  ', 'wr',
 ];
 
 const engine = new ChessEngine();
