@@ -76,11 +76,14 @@ function eventInsideElement(element, event) {
 }
 
 /**
- * Handles player click or drag.
+ * Handles player click or drag on the game board.
  * @param {MouseEvent} event - The mouse event.
  * @returns {undefined} - Return value is not used.
  */
 function handleMouseDown(event) {
+  /* Disallow board interactions when game over. */
+  if (engine.isGameOver()) return;
+
   /* Blocks click while dragging, or click from outside board */
   if (ui.isDragging || !eventInsideElement(board, event)) {
     ui.deselect();
@@ -130,6 +133,15 @@ function handleContextMenu(event) {
 }
 
 /**
+ * Called to restart the game when player clicks rematch button.
+ */
+function handleRematch() {
+  engine.init(layout);
+  ui.resetToBoardState();
+  ui.closeGameOverModal();
+}
+
+/**
  * Sets up event listeners to allow player to interact with the board.
  */
 function initPlayerControls() {
@@ -176,6 +188,8 @@ class UserInterface {
     this.captureMarkers = document.getElementById('capture-markers');
     this.pieces = document.getElementById('pieces');
     this.promotionWindow = document.getElementById('promotion-window');
+    this.gameOverModal = document.getElementById('game-over-modal');
+    this.rematchButton = document.getElementById('rematch-button');
     /* Variables for selecting and moving pieces. */
     this.undraggableSquares = [];
     this.selected = null;
@@ -472,8 +486,31 @@ class UserInterface {
       this.pieces.appendChild(piece);
     }
     // TODO: Keep track of captured pieces.
+    /* Handle game over if move results in checkmate. */
+    if (this.engine.isGameOver()) {
+      this.#openGameOverModal();
+    };
     this.deselect();
     return success;
+  }
+
+  /**
+   * Opens game over pop-up on checkmate.
+   */
+  #openGameOverModal() {
+    const winningColor = this.engine.getPlayingColor() === PieceColor.WHITE ? 'Black' : 'White';
+    const winnerTitle = document.getElementById('winner-title');
+    winnerTitle.innerText = `${winningColor} Won`;
+    this.gameOverModal.style.display = 'flex';
+    this.rematchButton.addEventListener('click', handleRematch);
+  }
+
+  /**
+   * Closes the game over pop-up when player clicks rematch.
+   */
+  closeGameOverModal() {
+    this.gameOverModal.style.display = 'none';
+    this.rematchButton.removeEventListener('click', handleRematch);
   }
 
   /**
@@ -1135,6 +1172,7 @@ class ChessEngine {
   #width = 8;
   #height = 8;
   #size = this.#width * this.#height;
+  #isGameOver = true;
 
   /** Create a chess engine. */
   constructor() {
@@ -1161,7 +1199,18 @@ class ChessEngine {
       const piece = pieceFromCode(layout[i]);
       this.grid.setValueAt(center, piece);
     }
+    this.#resetGameVariables();
     this.#precomputeMoves();
+  }
+
+  /**
+   * Sets default values for a new game.
+   */
+  #resetGameVariables() {
+    this.playingColor = PieceColor.WHITE;
+    this.takenPiece = null;
+    this.lastMove = null;
+    this.#isGameOver = false;
   }
 
   /**
@@ -1190,13 +1239,14 @@ class ChessEngine {
 
   /**
    * Calculates all valid moves for the current board state and playing color.
+   * @return {number} - The number of valid moves.
    */
   #precomputeMoves() {
     /* Reset the previous precomputed moves */
     this.#resetMoveArray();
+    let validMoveCount = 0;
 
     /* Calculate for current board state */
-    let validMoveCount = 0;
     this.grid.each((center, piece) => {
       if (!piece) return;
       if (piece.color !== this.playingColor) return;
@@ -1213,6 +1263,7 @@ class ChessEngine {
       validMoveCount += validMoves.length;
       this.moveArray[center.x + center.y * this.#width] = validMoves;
     });
+    return validMoveCount;
   }
 
   /**
@@ -1312,11 +1363,11 @@ class ChessEngine {
   }
 
   /**
-   * Gets the current color to move.
-   * @returns {PieceColor} The color as a string.
+   * Checks if game is currently over from checkmate.
+   * @returns {boolean} True if game is over.
    */
-  getPlayingColor() {
-    return this.playingColor;
+  isGameOver() {
+    return this.#isGameOver;
   }
 
   /**
@@ -1357,9 +1408,17 @@ class ChessEngine {
    * @param {Point} pointFrom - The origin point.
    * @param {Point} pointTo - The destination point.
    * @param {string} promotionCode - The piece code if promoting a pawn.
-   * @returns {boolean} True if move was successful.
+   * @returns {Object} Contains success status, and the move object if successful.
    */
   move(pointFrom, pointTo, promotionCode) {
+    if (this.#isGameOver) {
+      /* Prevent moves if game is over. */
+      return {
+        success: false, 
+        move: undefined,
+      }
+    }
+
     const moves = this.getMovesAtPoint(pointFrom);
     let isValid = false;
     let move = null;
@@ -1386,12 +1445,14 @@ class ChessEngine {
         this.grid.setValueAt(move.to, promotionPiece);
         promotionPiece.moved = true;
       }
-
       /* Preparation for next move. */
       this.lastMove = move;
       this.#swapPlayingColor();
-      this.#precomputeMoves();
-      // TODO: handle checkmate.
+      /* Handle checkmate. */
+      const numMoves = this.#precomputeMoves();
+      if (numMoves === 0) {
+        this.#isGameOver = true;
+      }
     }
     return {
       success: isValid, 
@@ -1488,7 +1549,15 @@ class ChessEngineAdapter {
    * Get the current color to move.
    */
   getPlayingColor() {
-    return this.engine.getPlayingColor();
+    return this.engine.playingColor;
+  }
+
+  /**
+   * Checks if game has ended after checkmate.
+   * @returns {boolean} True if game is over.
+   */
+  isGameOver() {
+    return this.engine.isGameOver();
   }
 
   /**
@@ -1545,14 +1614,14 @@ class ChessEngineAdapter {
 }
 
 const layout = [
-  'br', '  ', '  ', '  ', '  ', 'br', 'bk', '  ',
-  'bp', 'bp', 'bp', 'wp', '  ', 'bp', 'bp', 'bp',
-  '  ', 'bn', 'bb', '  ', '  ', '  ', '  ', '  ',
+  'br', 'bn', 'bb', 'bq', 'bk', 'bb', 'bn', 'br',
+  '  ', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp',
   '  ', '  ', '  ', '  ', '  ', '  ', '  ', '  ',
-  '  ', '  ', '  ', 'wb', 'bp', '  ', 'bq', '  ',
-  '  ', 'wn', 'wb', 'wq', '  ', '  ', '  ', '  ',
-  'wp', 'wp', 'wp', '  ', '  ', 'wp', 'wp', 'wp',
-  'wr', '  ', '  ', '  ', 'wk', 'wr', '  ', 'wr',
+  'bq', 'br', '  ', '  ', '  ', '  ', '  ', '  ',
+  '  ', 'bq', '  ', '  ', '  ', '  ', '  ', '  ',
+  '  ', '  ', '  ', '  ', '  ', '  ', '  ', '  ',
+  'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp',
+  '  ', 'wk', '  ', 'wq', '  ', 'wb', 'wn', 'wr',
 ];
 
 const engine = new ChessEngine();

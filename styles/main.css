@@ -18,7 +18,15 @@ html {
   user-select: none;
 }
 
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 97vh;
+}
+
 #board {
+  position: absolute;
   background-image: url("../graphics/chessboard.png");
   background-repeat: no-repeat;
   background-size: cover;
@@ -37,7 +45,7 @@ html {
 }
 
 .dragging {
-  z-index: 3; /* To be above everything. */
+  z-index: 3; /* To be above pieces and markers. */
   cursor: grabbing;
 }
 
@@ -51,7 +59,7 @@ html {
 }
 
 .move-marker {
-  z-index: 2; /* To be above move markers. */
+  z-index: 2; /* To be above pieces. */
   position: absolute;
   background-clip: content-box;
   background-color: black;
@@ -63,7 +71,7 @@ html {
 }
 
 .capture-marker {
-  z-index: 2; /* To be above move markers. */
+  z-index: 2; /* To be above move pieces. */
   position: absolute;
   border: calc(var(--board-length) / 64) solid black;
   opacity: .4;
@@ -73,7 +81,7 @@ html {
 }
 
 #promotion-window {
-  z-index: 4; /* To be above everything. */
+  z-index: 4; /* To be above draggeed pieces. */
   display: none;
   position: absolute;
   flex-direction: column;
@@ -86,4 +94,27 @@ html {
   cursor: pointer;
   width: calc(var(--board-length) / 8);
   height: calc(var(--board-length) / 8);
+}
+
+#game-over-modal {
+  z-index: 5; /* To be above everything. */
+  position: absolute;
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: white;
+  border: 1px solid black;
+  padding: 10px;
+}
+
+#rematch-button {
+  cursor: pointer;
+  background-color: gainsboro;
+  border-radius: 5px;
+  margin-top: 15px;
+}
+
+#rematch-button:hover {
+  background-color: dimgrey;
 }
