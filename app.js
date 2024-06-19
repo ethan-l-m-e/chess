@@ -145,8 +145,8 @@ function handleRematch() {
  * Sets up event listeners to allow player to interact with the board.
  */
 function initPlayerControls() {
-  window.addEventListener('mousedown', handleMouseDown);
-  window.addEventListener('mouseup', handleMouseUp);
+  window.addEventListener('pointerdown', handleMouseDown);
+  window.addEventListener('pointerup', handleMouseUp);
   board.addEventListener('contextmenu', handleContextMenu);
 }
 
@@ -543,7 +543,7 @@ class UserInterface {
     this.draggedPiece.classList.add('dragging');
     
     ui.#dragPiece(event); // Fire drag event once on initial click
-    document.addEventListener('mousemove', this.dragFunction);
+    document.addEventListener('pointermove', this.dragFunction);
   }
 
   /**
@@ -557,7 +557,7 @@ class UserInterface {
     this.draggedPiece.classList.remove('dragging');
     this.draggedPiece = null;
     this.isDragging = false;
-    document.removeEventListener('mousemove', this.dragFunction);
+    document.removeEventListener('pointermove', this.dragFunction);
   }
 
   /**
