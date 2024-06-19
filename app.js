@@ -812,6 +812,7 @@ class Pawn extends Piece {
     /* Diagonal capture. */
     this.capturingDirections.forEach((direction) => {
       const newPos = center.add(direction);
+      if (!grid.isInside(newPos)) return;
       const existingPiece = grid.valueAt(newPos);
       if (existingPiece) {
         if (existingPiece.color !== this.color) {
@@ -823,6 +824,7 @@ class Pawn extends Piece {
     if (lastMove && lastMove.piece instanceof Pawn && lastMove.piece.color !== this.color) {
       this.sides.forEach((side) => {
         const sidePos = center.add(side);
+        if (!grid.isInside(sidePos)) return;
         const expectedStartPos = sidePos.add(this.direction).add(this.direction);
         if (sidePos.equals(lastMove.to) && expectedStartPos.equals(lastMove.from)) {
           const endPos = sidePos.add(this.direction);
@@ -1253,6 +1255,7 @@ class ChessEngine {
       const moves = piece.move(center, this.grid, this.lastMove);
       const validMoves = [];
       moves.forEach((move) => {
+        if (!this.grid.isInside(move.to)) throw new Error('Invalid move generated');
         this.#step(move);
         if (piece.color === this.playingColor &&
           this.#validatePosition(move)) {
@@ -1615,13 +1618,13 @@ class ChessEngineAdapter {
 
 const layout = [
   'br', 'bn', 'bb', 'bq', 'bk', 'bb', 'bn', 'br',
-  '  ', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp',
+  'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp',
   '  ', '  ', '  ', '  ', '  ', '  ', '  ', '  ',
-  'bq', 'br', '  ', '  ', '  ', '  ', '  ', '  ',
-  '  ', 'bq', '  ', '  ', '  ', '  ', '  ', '  ',
+  '  ', '  ', '  ', '  ', '  ', '  ', '  ', '  ',
+  '  ', '  ', '  ', '  ', '  ', '  ', '  ', '  ',
   '  ', '  ', '  ', '  ', '  ', '  ', '  ', '  ',
   'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp',
-  '  ', 'wk', '  ', 'wq', '  ', 'wb', 'wn', 'wr',
+  'wr', 'wn', 'wb', 'wq', 'wk', 'wb', 'wn', 'wr',
 ];
 
 const engine = new ChessEngine();
