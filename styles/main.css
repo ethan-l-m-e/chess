@@ -1,5 +1,14 @@
 :root {
   --board-length: 400px;
+
+  overflow: hidden;
+  position: absolute;
+  top:0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  max-width: 100vw;
+  max-height: 100vh;
 }
 
 * {
@@ -22,7 +31,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 97vh;
+  height: 100vh;
 }
 
 #board {
@@ -47,6 +56,7 @@ body {
 .dragging {
   z-index: 3; /* To be above pieces and markers. */
   cursor: grabbing;
+  touch-action: none;
 }
 
 .highlight {
