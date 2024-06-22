@@ -35,6 +35,7 @@ body {
 }
 
 #board {
+  touch-action: none;
   position: absolute;
   background-image: url("../graphics/chessboard.png");
   background-repeat: no-repeat;
