@@ -28,6 +28,7 @@ html {
 }
 
 body {
+  touch-action: manipulation;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -35,6 +36,7 @@ body {
 }
 
 #board {
+  touch-action: none;
   position: absolute;
   background-image: url("../graphics/chessboard.png");
   background-repeat: no-repeat;
