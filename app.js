@@ -190,7 +190,8 @@ class UserInterface {
     this.promotionWindow = document.getElementById('promotion-window');
     this.gameOverModal = document.getElementById('game-over-modal');
     this.rematchButton = document.getElementById('rematch-button');
-    this.moveSound = document.getElementById('move-sound');
+    this.whiteMoveSound = document.getElementById('white-move');
+    this.blackMoveSound = document.getElementById('black-move');
     /* Variables for selecting and moving pieces. */
     this.undraggableSquares = [];
     this.selected = null;
@@ -488,7 +489,11 @@ class UserInterface {
     }
     // TODO: Keep track of captured pieces.
     /* Make sounds. */
-    this.moveSound.cloneNode(true).play();
+    if (move.piece.color === PieceColor.WHITE) {
+      this.whiteMoveSound.cloneNode(true).play();
+    } else {
+      this.blackMoveSound.cloneNode(true).play();
+    }
     /* Handle game over if move results in checkmate. */
     if (this.engine.isGameOver()) {
       this.#openGameOverModal();
