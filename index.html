@@ -10,16 +10,19 @@
     <script src="./app.js" defer></script>
 </head>
 <body>
-    <div id="board">
-        <div id="highlights"></div>
-        <div id="move-markers"></div>
-        <div id="capture-markers"></div>
-        <div id="pieces"></div>
-        <div id="promotion-window"></div>
-    </div>
-    <div id="game-over-modal">
-      <div id="winner-title">Black Won</div>
-      <button id="rematch-button" type="button">Rematch</button>
-    </div>
+  <div id="board">
+      <div id="highlights"></div>
+      <div id="move-markers"></div>
+      <div id="capture-markers"></div>
+      <div id="pieces"></div>
+      <div id="promotion-window"></div>
+  </div>
+  <div id="game-over-modal">
+    <div id="winner-title">Black Won</div>
+    <button id="rematch-button" type="button">Rematch</button>
+  </div>
+  <audio preload="auto" id="move-sound">
+    <source src="./sounds/move.wav" type="audio/wav">
+  </audio>
 </body>
 </html>
