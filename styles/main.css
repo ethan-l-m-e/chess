@@ -1,5 +1,6 @@
 :root {
   --board-length: 400px;
+  --board-squares: 8;
 
   overflow: hidden;
   position: absolute;
@@ -45,14 +46,25 @@ body {
   height: var(--board-length);
 }
 
+.flipped {
+  transform: rotate(180deg);
+}
+
+#board.flipped .pieceImage {
+  transform: rotate(180deg);
+}
+
 .piece {
   z-index: 1; /* To be above highlights. */
   cursor: grab;
   position: absolute;
+}
+
+.pieceImage {
   background-repeat: no-repeat;
   background-size: cover;
-  width: calc(var(--board-length) / 8);
-  height: calc(var(--board-length) / 8);
+  width: calc(var(--board-length) / var(--board-squares));
+  height: calc(var(--board-length) / var(--board-squares));
 }
 
 .dragging {

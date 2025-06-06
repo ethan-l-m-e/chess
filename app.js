@@ -1,3 +1,6 @@
+const BOARD_SQUARES_WIDTH = 8;
+const BOARD_SQUARES_HEIGHT = 8;
+
 /**
  * Gets the CSS value (defined in pixels) of the board length.
  * @returns {number} The board length.
@@ -52,10 +55,14 @@ function getSquareNumberOfMouse(mousePosition) {
     return undefined;
   }
 
-  const squareLength = boardLength / 8;
-  const col = Math.floor(mousePosition.x / squareLength);
-  const row = Math.floor(mousePosition.y / squareLength);
-  return col + row * 8;
+  const squareLength = boardLength / BOARD_SQUARES_WIDTH;
+  col = Math.floor(mousePosition.x / squareLength);
+  row = Math.floor(mousePosition.y / squareLength);
+  if (ui.flipped === true) {
+    col = BOARD_SQUARES_HEIGHT - 1 - col;
+    row = BOARD_SQUARES_WIDTH - 1 - row;
+  }
+  return col + row * BOARD_SQUARES_HEIGHT;
 }
 
 /**
@@ -136,6 +143,7 @@ function handleContextMenu(event) {
  * Called to restart the game when player clicks rematch button.
  */
 function handleRematch() {
+  console.log("Resetting match...")
   engine.init(layout);
   ui.resetToBoardState();
   ui.closeGameOverModal();
@@ -148,6 +156,8 @@ function initPlayerControls() {
   window.addEventListener('pointerdown', handleMouseDown);
   window.addEventListener('pointerup', handleMouseUp);
   board.addEventListener('contextmenu', handleContextMenu);
+
+  console.log("Enabled player controls.")
 }
 
 /**
@@ -186,6 +196,7 @@ class UserInterface {
     this.highlights = document.getElementById('highlights');
     this.moveMarkers = document.getElementById('move-markers');
     this.captureMarkers = document.getElementById('capture-markers');
+    this.board = document.getElementById('board');
     this.pieces = document.getElementById('pieces');
     this.promotionWindow = document.getElementById('promotion-window');
     this.gameOverModal = document.getElementById('game-over-modal');
@@ -203,6 +214,10 @@ class UserInterface {
     this.isDragging = false;
     /* Bind function to this class to give access to class properties. */
     this.dragFunction = this.#dragPiece.bind(this);
+    /* Flip board */
+    this.flipped = false;
+
+    console.log("Initialized UI.")
   }
 
   /**
@@ -227,6 +242,11 @@ class UserInterface {
     const piece = document.createElement('div');
     piece.classList.add('piece');
     piece.classList.add(code);
+
+    /* Separated div for image as need to transform piece position and image rotation separately. */
+    const pieceImage = document.createElement('div');
+    pieceImage.classList.add('pieceImage');
+    piece.appendChild(pieceImage);
     return piece;
   }
 
@@ -303,6 +323,18 @@ class UserInterface {
       elements.push(element);
     });
     this.pieces.replaceChildren(...elements);
+  }
+
+  /**
+   * Sets the board state and style to flipped.
+   */
+  #flipBoard() {
+    this.board.classList.toggle('flipped');
+    if (this.flipped === true) {
+      this.flipped = false;
+    } else {
+      this.flipped = true;
+    }
   }
 
   /**
@@ -401,9 +433,9 @@ class UserInterface {
   #openPromotionWindow(squareNumber) {
     /* Set position. */
     const boardLength = getBoardLength();
-    const squareLength = boardLength / 8;
-    const x = squareNumber % 8;
-    const y = Math.min(Math.floor(squareNumber / 8), 4);
+    const squareLength = boardLength / BOARD_SQUARES_WIDTH;
+    const x = squareNumber % BOARD_SQUARES_WIDTH;
+    const y = Math.min(Math.floor(squareNumber / BOARD_SQUARES_WIDTH), 4);
     this.promotionWindow.style.transform = `translate(${x * squareLength}px, ` +
       `${y * squareLength}px)`;
     this.promotionWindow.style.display = 'flex';
@@ -497,7 +529,10 @@ class UserInterface {
     /* Handle game over if move results in checkmate. */
     if (this.engine.isGameOver()) {
       this.#openGameOverModal();
-    };
+    } else {
+      /* Flip for next player to move. */
+      this.#flipBoard();
+    }
     this.deselect();
     return success;
   }
@@ -511,6 +546,7 @@ class UserInterface {
     winnerTitle.innerText = `${winningColor} Won`;
     this.gameOverModal.style.display = 'flex';
     this.rematchButton.addEventListener('click', handleRematch);
+    console.log("Game Over: %s wins.", winningColor);
   }
 
   /**
@@ -591,11 +627,16 @@ class UserInterface {
     }
 
     const boardLength = getBoardLength();
-    const squareLength = boardLength / 8;
+    const squareLength = boardLength / BOARD_SQUARES_WIDTH;
     const mousePosition = getMousePositionInElement(board, event);
     /* Keep mousePosition within the board */
     mousePosition.x = keepWithin(mousePosition.x, 0, boardLength);
     mousePosition.y = keepWithin(mousePosition.y, 0, boardLength);
+    /* Reverse if flipped board */
+    if (this.flipped === true) {
+      mousePosition.x = boardLength - mousePosition.x;
+      mousePosition.y = boardLength - mousePosition.y;
+    }
     /* Move the piece along with the mouse */
     this.draggedPiece.style.transform = `translate(${mousePosition.x - squareLength / 2}px, ` +
       `${mousePosition.y - squareLength / 2}px)`;
@@ -1179,13 +1220,27 @@ const PieceColor = {
 
 /** Class managing the chess game state. */
 class ChessEngine {
-  #width = 8;
-  #height = 8;
-  #size = this.#width * this.#height;
+  #width;
+  #height;
+  #size;
   #isGameOver = true;
 
-  /** Create a chess engine. */
-  constructor() {
+  /** 
+   * Create a chess engine. 
+   * @param {number} width - The width of the chess board.
+   * @param {number} height - The height of the chess board.
+   */
+  constructor(width, height) {
+    if (Number.isInteger(width) && width > 0 && Number.isInteger(height) && height > 0) {
+      this.#width = width;
+      this.#height = height;
+      console.log("Init chess engine with width %i and height %i.", width, height);
+    } else {
+      this.#width = 8;
+      this.#height = 8;
+      console.log("Init chess engine with invalid size, default to 8x8.");
+    }
+    this.#size = this.#width * this.#height;
     this.grid = new Grid(this.#width, this.#height);
     this.moveArray = new Array(this.#width * this.#height);
     this.playingColor = PieceColor.WHITE;
@@ -1488,7 +1543,7 @@ class ChessEngineAdapter {
    * @returns {number} The equivalent square number.
    */
   squareNumberFromPoint(point) {
-    return point.x + point.y * 8;
+    return point.x + point.y * BOARD_SQUARES_WIDTH;
   }
 
   /**
@@ -1497,8 +1552,8 @@ class ChessEngineAdapter {
    * @returns {Point} The equivalent point object.
    */
   pointFromSquareNumber(squareNumber) {
-    const row = squareNumber % 8;
-    const col = Math.floor(squareNumber / 8);
+    const row = squareNumber % BOARD_SQUARES_WIDTH;
+    const col = Math.floor(squareNumber / BOARD_SQUARES_HEIGHT);
     return new Point(row, col);
   }
 
@@ -1635,7 +1690,7 @@ const layout = [
   'wr', 'wn', 'wb', 'wq', 'wk', 'wb', 'wn', 'wr',
 ];
 
-const engine = new ChessEngine();
+const engine = new ChessEngine(BOARD_SQUARES_WIDTH, BOARD_SQUARES_HEIGHT);
 engine.init(layout);
 const ui = new UserInterface(new ChessEngineAdapter(engine));
 ui.resetToBoardState();

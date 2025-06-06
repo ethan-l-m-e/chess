@@ -1,47 +1,47 @@
-.wp {
+.wp .pieceImage {
   background-image: url("../graphics/pawn-w.png");
 }
 
-.wr {
+.wr .pieceImage {
   background-image: url("../graphics/rook-w.png");
 }
 
-.wn {
+.wn .pieceImage {
   background-image: url("../graphics/knight-w.png");
 }
 
-.wb {
+.wb .pieceImage {
   background-image: url("../graphics/bishop-w.png");
 }
 
-.wk {
+.wk .pieceImage {
   background-image: url("../graphics/king-w.png");
 }
 
-.wq {
+.wq .pieceImage {
   background-image: url("../graphics/queen-w.png");
 }
 
-.bp {
+.bp .pieceImage {
   background-image: url("../graphics/pawn-b.png");
 }
 
-.br {
+.br .pieceImage {
   background-image: url("../graphics/rook-b.png");
 }
 
-.bn {
+.bn .pieceImage {
   background-image: url("../graphics/knight-b.png");
 }
 
-.bb {
+.bb .pieceImage {
   background-image: url("../graphics/bishop-b.png");
 }
 
-.bk {
+.bk .pieceImage {
   background-image: url("../graphics/king-b.png");
 }
 
-.bq {
+.bq .pieceImage {
   background-image: url("../graphics/queen-b.png");
 }
