@@ -234,6 +234,18 @@ class UserInterface {
   }
 
   /**
+   * Adds a separate div for the image of the piece, as need to transform piece position and image rotation separately.
+   * @param {HTMLElement} element - The element to add the piece image to.
+   * @returns {HTMLElement} The modified element.
+   */
+  #addPieceImageToElement(element) {
+    const pieceImage = document.createElement('div');
+    pieceImage.classList.add('pieceImage');
+    element.appendChild(pieceImage);
+    return element;
+  }
+
+  /**
    * Creates a HTML element with the appropriate classes for a piece.
    * @param {string} code - The string code of the piece.
    * @returns {HTMLElement} The created piece.
@@ -243,11 +255,21 @@ class UserInterface {
     piece.classList.add('piece');
     piece.classList.add(code);
 
-    /* Separated div for image as need to transform piece position and image rotation separately. */
-    const pieceImage = document.createElement('div');
-    pieceImage.classList.add('pieceImage');
-    piece.appendChild(pieceImage);
+    this.#addPieceImageToElement(piece);
     return piece;
+  }
+
+  /**
+   * Creates a HTML element with the appropriate classes to show in the promotion window.
+   * @param {string} code - The string code of the piece.
+   * @returns {HTMLElement} The created promotion element.
+   */
+  #createPromotionElement(code) {
+    const optionClass = 'promotion-option';
+    const element = this.#createElement([optionClass, code]);
+
+    this.#addPieceImageToElement(element);
+    return element;
   }
 
   /**
@@ -441,15 +463,14 @@ class UserInterface {
     this.promotionWindow.style.display = 'flex';
     /* Fill in options. */
     const playingColor = this.engine.getPlayingColor();
-    const optionClass = 'promotion-option';
-    const queenCode = codeFromPiece(new Queen(playingColor));
-    const knightCode = codeFromPiece(new Knight(playingColor));
-    const rookCode = codeFromPiece(new Rook(playingColor));
-    const bishopCode = codeFromPiece(new Bishop(playingColor));
-    const queen = this.#createElement([optionClass, queenCode]);
-    const knight = this.#createElement([optionClass, knightCode]);
-    const rook = this.#createElement([optionClass, rookCode]);
-    const bishop = this.#createElement([optionClass, bishopCode]);
+    const queenCode = playingColor + PieceCode.QUEEN;
+    const knightCode = playingColor + PieceCode.KNIGHT;
+    const rookCode = playingColor + PieceCode.ROOK;
+    const bishopCode = playingColor + PieceCode.BISHOP;
+    const queen = this.#createPromotionElement(queenCode);
+    const knight = this.#createPromotionElement(knightCode);
+    const rook = this.#createPromotionElement(rookCode);
+    const bishop = this.#createPromotionElement(bishopCode);
     queen.addEventListener('click', () => {this.#handlePromotion(squareNumber, queenCode)});
     knight.addEventListener('click', () => {this.#handlePromotion(squareNumber, knightCode)});
     rook.addEventListener('click', () => {this.#handlePromotion(squareNumber, rookCode)});
