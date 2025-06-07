@@ -607,7 +607,7 @@ class UserInterface {
     this.isDragging = true;
     this.draggedPiece.classList.add('dragging');
     
-    this.#dragPiece(event); // Fire drag event once on initial click
+    ui.#dragPiece(event); // Fire drag event once on initial click
     document.addEventListener('pointermove', this.dragFunction);
   }
 
